@@ -1,0 +1,38 @@
+/*
+   ods
+   FACULTY
+   Department Heads or Chairs
+   M21FEB2022 \ 77k2f
+   */
+ 
+     
+with a    as (select       "pidm", "pvamu_id", "last_name", "first_name", "mi_name", "title", "gender", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department" 
+        from (select        szrcbm8_pidm"pidm", id"pvamu_id", last_name"last_name", first_name"first_name", mi"mi_name", title_code"title", szrcbm8_gender"gender", title_code_desc"title_description", to_char(promotion_date,'mm/dd/yyyy')"promotion_date", tenure_desc"tenured", highest_degree"highest_degree", college_code"clg", dept_code"dept", dept_desc"department", row_number()
+        over (partition by  szrcbm8_pidm
+              order by      szrcbm8_crn asc nulls last) rn
+              from          pvamuir.ir_v_cbm8_facdetail
+              where         szrcbm8_term_code = '202210'
+              and          (title_code_desc like '%Head%' 
+              or            title_code_desc like '%Chair%')
+              and           promotion_date<=to_date('02/17/2017','mm/dd/yyyy'))
+              where         rn=1)    
+      select               "pvamu_id", "last_name", "first_name", "mi_name", "title", "gender", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department"
+        from  a 
+    order by               "last_name", "first_name", "mi_name" ;
+
+
+/*  ms 8 n 13 -----------------------------------------------------------------------------------
+| Id  | Operation                 | Name                | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT          |                     |    93 | 51615 |   420   (1)| 00:00:01 |
+|   1 |  SORT ORDER BY            |                     |    93 | 51615 |   420   (1)| 00:00:01 |
+|*  2 |   VIEW                    |                     |    93 | 51615 |   419   (1)| 00:00:01 |
+|*  3 |    WINDOW SORT PUSHED RANK|                     |    93 | 11160 |   419   (1)| 00:00:01 |
+|*  4 |     TABLE ACCESS FULL     | IR_V_CBM8_FACDETAIL |    93 | 11160 |   418   (1)| 00:00:01 |
+-------------------------------------------------------------------------------------------------
+--  SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--  explain plan for
+--  ner join (select       "xx
+
+
+###
