@@ -1,0 +1,52 @@
+/*
+  ods
+  DEPARTMENT HEADS
+  M21FEB2022 \ 77k2f
+  */
+
+
+with a    as (select        pidm"pidm", fac_id"pvamu_id", last_name"last_name", first_name"first_name", mi"mi_name", rank_desc"rank_desc", ten_desc"tenure" 
+              from          pvamuir.ir_f_faculty_detail
+              where         fac_term='202220'
+              and          (rank_desc like '%Head%' 
+              or            rank_desc like '%Chair%'
+              or            rank_desc like '%Interim%')), 
+facu      as (select       "facu_pidm", "title", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department" 
+        from (select        szrcbm8_pidm"facu_pidm", id"pvamu_id", title_code"title", title_code_desc"title_description", to_char(promotion_date,'mm/dd/yyyy')"promotion_date", tenure_desc"tenured", highest_degree"highest_degree", college_code"clg", dept_code"dept", dept_desc"department", row_number()
+        over (partition by  szrcbm8_pidm
+              order by      szrcbm8_term_code desc nulls last) rn
+              from          pvamuir.ir_v_cbm8_facdetail
+              where         szrcbm8_pidm in(select "pidm" from a))
+              where         rn=1)
+      select               "pidm", "pvamu_id", "last_name", "first_name", "mi_name", "rank_desc", "tenure", "title", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department" 
+        from  a 
+   left join  facu          on "facu_pidm"="pidm" ;
+
+
+/* ms 43 n 19
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+-- SELECT * FROM pvamuir.ir_f_faculty_detail WHERE fac_term='202220' ;
+
+
+with a    as (select       "pidm", "pvamu_id", "last_name", "first_name", "mi_name", "title", "gender", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department" 
+        from (select        szrcbm8_pidm"pidm", id"pvamu_id", last_name"last_name", first_name"first_name", mi"mi_name", title_code"title", szrcbm8_gender"gender", title_code_desc"title_description", to_char(promotion_date,'mm/dd/yyyy')"promotion_date", tenure_desc"tenured", highest_degree"highest_degree", college_code"clg", dept_code"dept", dept_desc"department", row_number()
+        over (partition by  szrcbm8_pidm
+              order by      szrcbm8_crn asc nulls last) rn
+              from          pvamuir.ir_v_cbm8_facdetail
+              where         szrcbm8_term_code = '202210'
+              and          (title_code_desc like '%Head%' 
+              or            title_code_desc like '%Chair%'
+              or            title_code_desc like '%Interim%' )
+              --and           promotion_date<=to_date('02/17/2017','mm/dd/yyyy')
+              )
+              where         rn=1)    
+      select               "pvamu_id", "last_name", "first_name", "mi_name", "title", "gender", "title_description", "promotion_date", "tenured", "highest_degree", "clg", "dept", "department"
+        from  a 
+    order by               "last_name", "first_name", "mi_name" ;
+
+
+###
