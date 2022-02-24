@@ -1,0 +1,76 @@
+/*
+  ods
+  FACULTY FOR SPRING 2022
+  R24FEB2022 | 77k2c
+  */
+ 
+
+WITH a   AS ( SELECT       "PIDM" FROM(SELECT sirasgn_pidm"PIDM",Row_Number() OVER(PARTITION BY sirasgn_pidm ORDER BY sirasgn_crn ASC NULLS LAST) rn
+              FROM          sirasgn@prod
+              WHERE         sirasgn_term_code='202220') WHERE rn=1 ),
+facu      as (select       "facu_pidm", "CLG", "DEPT", "DEPARTMENT" 
+        from (select        szrcbm8_pidm"facu_pidm", college_code"CLG", dept_code"DEPT", dept_desc"DEPARTMENT", row_number()
+        over (partition by  szrcbm8_pidm
+              order by      szrcbm8_term_code desc nulls last) rn
+              from          pvamuir.ir_v_cbm8_facdetail
+              where         szrcbm8_pidm in(select "PIDM" from a))
+              where         rn=1)
+
+
+              SELECT       "PVAMU_ID","FIRST_NAME","LAST_NAME","PVAMU_EMAIL", "CLG", "DEPT", "DEPARTMENT"
+
+              FROM     a
+
+         LEFT JOIN     facu ON "facu_pidm"="PIDM"
+
+  LEFT JOIN ( SELECT   spriden_pidm"spriden_pidm",spriden_id"PVAMU_ID",spriden_first_name"FIRST_NAME",spriden_last_name"LAST_NAME" FROM spriden@prod WHERE spriden_change_ind IS NULL AND spriden_entity_ind='P' AND spriden_pidm IN(SELECT "PIDM" FROM a)) ON "spriden_pidm"="PIDM"
+
+  LEFT JOIN ( SELECT  "emlpv_pidm",Coalesce(u1,u2)"PVAMU_EMAIL"
+       FROM ( SELECT  "PIDM" "emlpv_pidm",
+            ( SELECT  "u1" FROM (SELECT goremal_pidm"u1_pidm",goremal_email_address"u1" FROM general.goremal@prod WHERE goremal_emal_code='FACU' AND goremal_status_ind='A' AND goremal_pidm IN(SELECT "PIDM" FROM a)) WHERE "u1_pidm"="PIDM") u1,
+            ( SELECT  "u2" FROM (SELECT goremal_pidm"u2_pidm",goremal_email_address"u2" FROM general.goremal@prod WHERE goremal_emal_code IN('PVEM','UNIV') AND goremal_status_ind='A' AND goremal_pidm IN(SELECT "PIDM" FROM a)) WHERE "u2_pidm"="PIDM") u2
+              FROM     a)) ON "emlpv_pidm"="PIDM"
+              ;
+
+
+/* ms 418 n 506 ------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |  2280 |  1249K| 18825   (1)| 00:00:02 |        |      |
+|*  1 |  HASH JOIN SEMI                          |                             |     1 |    85 |     7   (0)| 00:00:01 |        |      |
+|   2 |   REMOTE                                 | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|   3 |   VIEW                                   | VW_NSO_1                    |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|*  4 |    VIEW                                  |                             |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|   5 |     TABLE ACCESS FULL                    | SYS_TEMP_0FD9D81A1_AAA83B69 |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|*  6 |   HASH JOIN SEMI                         |                             |     1 |    85 |     8   (0)| 00:00:01 |        |      |
+|   7 |    REMOTE                                | GOREMAL                     |     1 |    72 |     5   (0)| 00:00:01 |   PROD | R->S |
+|   8 |    VIEW                                  | VW_NSO_2                    |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|*  9 |     VIEW                                 |                             |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  10 |      TABLE ACCESS FULL                   | SYS_TEMP_0FD9D81A1_AAA83B69 |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  11 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|  12 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D81A1_AAA83B69 |       |       |            |          |        |      |
+|* 13 |    VIEW                                  |                             |  1321 | 34346 |    10  (10)| 00:00:01 |        |      |
+|* 14 |     WINDOW SORT PUSHED RANK              |                             |  1321 | 51519 |    10  (10)| 00:00:01 |        |      |
+|  15 |      REMOTE                              | SIRASGN                     |  1321 | 51519 |     9   (0)| 00:00:01 |   PROD | R->S |
+|* 16 |   HASH JOIN RIGHT OUTER                  |                             |  2280 |  1249K| 18815   (1)| 00:00:02 |        |      |
+|  17 |    VIEW                                  |                             |  1321 |   349K| 16242   (1)| 00:00:02 |        |      |
+|  18 |     VIEW                                 |                             |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  19 |      TABLE ACCESS FULL                   | SYS_TEMP_0FD9D81A1_AAA83B69 |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|* 20 |    HASH JOIN OUTER                       |                             |  1476 |   418K|  2573   (1)| 00:00:01 |        |      |
+|  21 |     VIEW                                 |                             |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  22 |      TABLE ACCESS FULL                   | SYS_TEMP_0FD9D81A1_AAA83B69 |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  23 |     VIEW                                 |                             |   955 |   258K|  2573   (1)| 00:00:01 |        |      |
+|  24 |      NESTED LOOPS                        |                             |   955 |   124K|  2573   (1)| 00:00:01 |        |      |
+|  25 |       VIEW                               | VW_NSO_3                    |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  26 |        HASH UNIQUE                       |                             |   855 | 17173 |            |          |        |      |
+|  27 |         VIEW                             |                             |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  28 |          TABLE ACCESS FULL               | SYS_TEMP_0FD9D81A1_AAA83B69 |  1321 | 17173 |     3   (0)| 00:00:01 |        |      |
+|  29 |       REMOTE                             | SPRIDEN                     |     1 |   120 |     3   (0)| 00:00:01 |   PROD | R->S |
+----------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--with a as ( select  "x
+
+
+
+###
