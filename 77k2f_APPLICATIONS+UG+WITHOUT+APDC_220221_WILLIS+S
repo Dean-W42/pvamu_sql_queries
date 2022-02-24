@@ -1,0 +1,243 @@
+/*
+  ods
+  APPLICANTS WITHOUT AN ADMISSION DECISION
+  M21FEB2022 \ 77k2f
+  */
+
+
+with a    as (select       "pidm", "entry_term", "lvl", "apst", "admt", "styp", "appno" 
+        from (select        saradap_pidm"pidm", saradap_term_code_entry"entry_term", saradap_levl_code"lvl", saradap_apst_code"apst", saradap_admt_code"admt", saradap_styp_code"styp", saradap_appl_no"appno", row_number()    
+        over (partition by  saradap_pidm
+              order by      saradap_appl_no desc nulls last) rn
+              from          saradap@prod
+              where         saradap_term_code_entry between '202230' and '202310'
+  and exists (select        stvapst_code from stvapst where stvapst_code=saradap_apst_code and stvapst_code<>'D')
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=saradap_levl_code and stvlevl_code='UG')) 
+              where         rn=1),   
+b         as (select       "b_pidm", "entry_term_2", "lvl_2", "apst_2", "admt_2", "styp_2", "b_appno" 
+        from (select        saradap_pidm"b_pidm", saradap_term_code_entry"entry_term_2", saradap_levl_code"lvl_2", saradap_apst_code"apst_2", saradap_admt_code"admt_2", saradap_styp_code"styp_2", saradap_appl_no"b_appno", row_number()    
+        over (partition by  saradap_pidm
+              order by      saradap_appl_no desc nulls last) rn
+              from          saradap@prod
+              where         saradap_term_code_entry between '202230' and '202310'
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=saradap_levl_code and stvlevl_code='UG')
+              and           saradap_pidm in(select "pidm" from a)) 
+              where         rn=2), 
+c         as (select       "c_pidm", "c_term", "c_appno", "apdc_2"
+        from (select        sarappd_pidm"c_pidm", sarappd_term_code_entry"c_term", sarappd_appl_no"c_appno", sarappd_apdc_code"apdc_2", row_number()
+        over (partition by  sarappd_pidm || sarappd_term_code_entry || sarappd_appl_no
+              order by      sarappd_seq_no desc nulls last) rn
+              from          sarappd@prod 
+              where         sarappd_term_code_entry between '202230' and '202310'
+              and           sarappd_pidm in(select "b_pidm" from b))   
+              where         rn=1),  
+name      as (select        spriden_pidm"name_pidm", spriden_id"pvamu_id", spriden_last_name"last_name", spriden_first_name"first_name", spriden_mi"mi_name"
+              from          spriden@prod
+              where         spriden_change_ind is null   
+              and           spriden_entity_ind='P'), 
+pveml     as (select        distinct "pveml_pidm", coalesce(pv1,pv2,pv3,pv4,pv5)"pvamu_email"
+        from (select        saradap_pidm "pveml_pidm",                                
+             (select       "pv1" from(select goremal_pidm"pv1_pidm", goremal_email_address"pv1" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv1_pidm"=saradap_pidm) pv1,
+             (select       "pv2" from(select goremal_pidm"pv2_pidm", goremal_email_address"pv2" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv2_pidm"=saradap_pidm) pv2,
+             (select       "pv3" from(select goremal_pidm"pv3_pidm", goremal_email_address"pv3" from goremal@prod where goremal_emal_code='FACU' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv3_pidm"=saradap_pidm) pv3,
+             (select       "pv4" from(select goremal_pidm"pv4_pidm", goremal_email_address"pv4" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv4_pidm"=saradap_pidm) pv4,             
+             (select       "pv5" from(select goremal_pidm"pv5_pidm", goremal_email_address"pv5" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='N') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv5_pidm"=saradap_pidm) pv5
+              from          saradap@prod   
+              where         saradap_pidm in(select "pidm" from a))),
+preml     as (select       "preml_pidm", coalesce(pr1,pr2,pr3,pr4,pr5,pr6)"personal_email"
+        from (select        distinct saradap_pidm "preml_pidm",    
+             (select       "pr1" from(select u.goremal_pidm"pr1_pidm", u.goremal_email_address"pr1", row_number() over(partition by u.goremal_pidm order by u.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod u where u.goremal_emal_code = 'TXCA' and u.goremal_status_ind = 'A' and u.goremal_preferred_ind = 'Y' and regexp_like(u.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and u.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr1_pidm"=saradap_pidm) pr1,
+             (select       "pr2" from(select v.goremal_pidm"pr2_pidm", v.goremal_email_address"pr2", row_number() over(partition by v.goremal_pidm order by v.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod v where v.goremal_emal_code = 'PERS' and v.goremal_status_ind = 'A' and v.goremal_preferred_ind = 'Y' and regexp_like(v.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and v.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr2_pidm"=saradap_pidm) pr2,  
+             (select       "pr3" from(select w.goremal_pidm"pr3_pidm", w.goremal_email_address"pr3", row_number() over(partition by w.goremal_pidm order by w.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod w where w.goremal_emal_code = 'ALUM' and w.goremal_status_ind = 'A' and w.goremal_preferred_ind = 'Y' and regexp_like(w.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and w.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr3_pidm"=saradap_pidm) pr3,  
+             (select       "pr4" from(select x.goremal_pidm"pr4_pidm", x.goremal_email_address"pr4", row_number() over(partition by x.goremal_pidm order by x.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod x where x.goremal_emal_code = 'PERS' and x.goremal_status_ind = 'A' and x.goremal_preferred_ind = 'N' and regexp_like(x.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and x.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr4_pidm"=saradap_pidm) pr4,   
+             (select       "pr5" from(select y.goremal_pidm"pr5_pidm", y.goremal_email_address"pr5", row_number() over(partition by y.goremal_pidm order by y.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod y where y.goremal_emal_code = 'TXCA' and y.goremal_status_ind = 'A' and y.goremal_preferred_ind = 'N' and regexp_like(y.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and y.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr5_pidm"=saradap_pidm) pr5,
+             (select       "pr6" from(select z.goremal_pidm"pr6_pidm", z.goremal_email_address"pr6", row_number() over(partition by z.goremal_pidm order by z.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod z where z.goremal_emal_code = 'ISIR' and z.goremal_status_ind = 'A' and z.goremal_preferred_ind = 'N' and regexp_like(z.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and z.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr6_pidm"=saradap_pidm) pr6
+              from          saradap@prod     
+              where         saradap_pidm in(select "pidm" from a)))
+                            
+      select               "pidm", "pvamu_id", "last_name", "first_name", "mi_name", 
+                           "entry_term",   
+             (select        stvterm_desc from stvterm where stvterm_code="entry_term") "entry_semester",
+                           "lvl", "apst", "admt", "styp", 
+                             "admr_1",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_1" )  "missing_item_1",
+                             "admr_2",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_2" )  "missing_item_2",
+                             "admr_3",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_3" )  "missing_item_3",
+                             "admr_4",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_4" )  "missing_item_4",
+                             "admr_5",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_5" )  "missing_item_5",
+                             "admr_6",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_6" )  "missing_item_6",
+                             "admr_7",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_7" )  "missing_item_7",
+                             "admr_8",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_8" )  "missing_item_8",
+                             "admr_9",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_9" )  "missing_item_9",
+                             "admr_10",
+               ( select       stvadmr_desc from saturn.stvadmr where stvadmr_code = "admr_10" ) "missing_item_10",                           
+                           "entry_term_2", 
+             (select        stvterm_desc from stvterm where stvterm_code="entry_term_2") "entry_2_semester",                           
+                           "apst_2", "admt_2", "styp_2", "apdc_2", 
+             (select        stvapdc_desc from stvapdc where stvapdc_code="apdc_2") "apdc_2_decision",
+                           "pvamu_email", "personal_email"
+      
+        from  a 
+   left join  b             on "b_pidm"="pidm" 
+   left join  c             on "c_pidm"="pidm" and "c_term"="entry_term_2" and "c_appno"="b_appno" 
+   left join  name          on "name_pidm"="pidm" 
+   left join  pveml         on "pveml_pidm"="pidm" 
+   left join  preml         on "preml_pidm"="pidm" 
+   
+left join      ( select      "sarchkl_1_pidm", "sarchkl_1_term", "sarchkl_1_appno", "admr_1"
+from           ( select       sarchkl_pidm"sarchkl_1_pidm", sarchkl_term_code_entry"sarchkl_1_term", sarchkl_appl_no"sarchkl_1_appno", sarchkl_admr_code"admr_1", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 1 )
+                 on          "sarchkl_1_pidm"  = "pidm"    
+                 and         "sarchkl_1_term"  = "entry_term"
+                 and         "sarchkl_1_appno" = "appno"
+
+left join      ( select      "sarchkl_2_pidm", "sarchkl_2_term", "sarchkl_2_appno", "admr_2"
+from           ( select       sarchkl_pidm"sarchkl_2_pidm", sarchkl_term_code_entry"sarchkl_2_term", sarchkl_appl_no"sarchkl_2_appno", sarchkl_admr_code"admr_2", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 2 )
+                 on          "sarchkl_2_pidm"  = "pidm"    
+                 and         "sarchkl_2_term"  = "entry_term"
+                 and         "sarchkl_2_appno" = "appno"
+
+left join      ( select      "sarchkl_3_pidm", "sarchkl_3_term", "sarchkl_3_appno", "admr_3"
+from           ( select       sarchkl_pidm"sarchkl_3_pidm", sarchkl_term_code_entry"sarchkl_3_term", sarchkl_appl_no"sarchkl_3_appno", sarchkl_admr_code"admr_3", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 3 )
+                 on          "sarchkl_3_pidm"  = "pidm"    
+                 and         "sarchkl_3_term"  = "entry_term"
+                 and         "sarchkl_3_appno" = "appno"
+
+left join      ( select      "sarchkl_4_pidm", "sarchkl_4_term", "sarchkl_4_appno", "admr_4"
+from           ( select       sarchkl_pidm"sarchkl_4_pidm", sarchkl_term_code_entry"sarchkl_4_term", sarchkl_appl_no"sarchkl_4_appno", sarchkl_admr_code"admr_4", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 4 )
+                 on          "sarchkl_4_pidm"  = "pidm"    
+                 and         "sarchkl_4_term"  = "entry_term"
+                 and         "sarchkl_4_appno" = "appno"
+
+left join      ( select      "sarchkl_5_pidm", "sarchkl_5_term", "sarchkl_5_appno", "admr_5"
+from           ( select       sarchkl_pidm"sarchkl_5_pidm", sarchkl_term_code_entry"sarchkl_5_term", sarchkl_appl_no"sarchkl_5_appno", sarchkl_admr_code"admr_5", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 5 )
+                 on          "sarchkl_5_pidm"  = "pidm"    
+                 and         "sarchkl_5_term"  = "entry_term"
+                 and         "sarchkl_5_appno" = "appno"
+
+left join      ( select      "sarchkl_6_pidm", "sarchkl_6_term", "sarchkl_6_appno", "admr_6"
+from           ( select       sarchkl_pidm"sarchkl_6_pidm", sarchkl_term_code_entry"sarchkl_6_term", sarchkl_appl_no"sarchkl_6_appno", sarchkl_admr_code"admr_6", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 6 )
+                 on          "sarchkl_6_pidm"  = "pidm"    
+                 and         "sarchkl_6_term"  = "entry_term"
+                 and         "sarchkl_6_appno" = "appno"
+
+left join      ( select      "sarchkl_7_pidm", "sarchkl_7_term", "sarchkl_7_appno", "admr_7"
+from           ( select       sarchkl_pidm"sarchkl_7_pidm", sarchkl_term_code_entry"sarchkl_7_term", sarchkl_appl_no"sarchkl_7_appno", sarchkl_admr_code"admr_7", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 7 )
+                 on          "sarchkl_7_pidm"  = "pidm"    
+                 and         "sarchkl_7_term"  = "entry_term"
+                 and         "sarchkl_7_appno" = "appno"
+
+left join      ( select      "sarchkl_8_pidm", "sarchkl_8_term", "sarchkl_8_appno", "admr_8"
+from           ( select       sarchkl_pidm"sarchkl_8_pidm", sarchkl_term_code_entry"sarchkl_8_term", sarchkl_appl_no"sarchkl_8_appno", sarchkl_admr_code"admr_8", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 8 )
+                 on          "sarchkl_8_pidm"  = "pidm"    
+                 and         "sarchkl_8_term"  = "entry_term"
+                 and         "sarchkl_8_appno" = "appno"
+
+left join      ( select      "sarchkl_9_pidm", "sarchkl_9_term", "sarchkl_9_appno", "admr_9"
+from           ( select       sarchkl_pidm"sarchkl_9_pidm", sarchkl_term_code_entry"sarchkl_9_term", sarchkl_appl_no"sarchkl_9_appno", sarchkl_admr_code"admr_9", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 9 )
+                 on          "sarchkl_9_pidm"  = "pidm"    
+                 and         "sarchkl_9_term"  = "entry_term"
+                 and         "sarchkl_9_appno" = "appno"
+
+left join      ( select      "sarchkl_10_pidm", "sarchkl_10_term", "sarchkl_10_appno", "admr_10"
+from           ( select       sarchkl_pidm"sarchkl_10_pidm", sarchkl_term_code_entry"sarchkl_10_term", sarchkl_appl_no"sarchkl_10_appno", sarchkl_admr_code"admr_10", row_number()
+over           ( partition by sarchkl_pidm || sarchkl_term_code_entry || sarchkl_appl_no
+                 order by     sarchkl_surrogate_id asc nulls last ) rn
+                 from         saturn.sarchkl@prod
+                 where        sarchkl_mandatory_ind = 'Y'
+                 and          sarchkl_receive_date is NULL                                                                 
+and exists     ( select       stvterm_code from saturn.stvterm where stvterm_code = sarchkl_term_code_entry and stvterm_code between '201530' and '202310' ))
+                 where        rn = 10 )
+                 on          "sarchkl_10_pidm"  = "pidm"    
+                 and         "sarchkl_10_term"  = "entry_term"
+                 and         "sarchkl_10_appno" = "appno" ;
+
+
+/* sec 34.942 n 8,962
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
