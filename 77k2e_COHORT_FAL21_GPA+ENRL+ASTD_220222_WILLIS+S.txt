@@ -1,0 +1,165 @@
+/*
+  ods
+  COHORT 2021
+  Academic Progress
+  T22FEB2022 \ 77k3e
+  */
+
+
+with a    as (select        cohort"cohort", cohort_term_code"term", cohort_pidm"pidm"
+              from          pvamuir.ir_v_cohort
+              where         cohort='CO2021'  
+              and           cohort_ftftfr='Y'),
+sex       as (select        sex.spbpers_pidm"sex_pidm", sex.spbpers_sex"sex", CASE WHEN sex.spbpers_sex = 'F' THEN 'Female' WHEN sex.spbpers_sex = 'M' THEN 'Male' ELSE 'Not Reported' END "gender"
+              from          saturn.spbpers@prod sex
+              where         sex.spbpers_pidm in (select "pidm" from a)),                
+race      as (select       "race_pidm", "ethn", "ethnicity"
+        from (select        x.race_pidm"race_pidm", x.race_code"ethn", x.race_desc"ethnicity", row_number()
+        over (partition by  x.race_pidm
+              order by      x.race_term_code desc nulls last) rn
+              from          pvamuir.ir_s_race_cert x  
+              where         x.race_pidm in(select "pidm" from a))
+              where         rn=1),
+majr      as (select       "majr_pidm", "clg", "lvl", "majr"
+        from (select        x.sgbstdn_pidm"majr_pidm", x.sgbstdn_levl_code"lvl", x.sgbstdn_coll_code_1"clg", x.sgbstdn_majr_code_1"majr", row_number()
+        over (partition by  x.sgbstdn_pidm
+              order by      x.sgbstdn_term_code_eff desc nulls last) rn
+              from          sgbstdn@prod x
+              where         x.sgbstdn_term_code_eff between '202030' and '202220'
+              and           x.sgbstdn_pidm in(select "pidm" from a))
+              where         rn=1),  
+gpa0      as (select        x.shrlgpa_pidm"gpa0_pidm", x.shrlgpa_hours_attempted"all_hrs_attempt", x.shrlgpa_hours_earned"all_hrs_earned", to_char(x.shrlgpa_gpa,9.999) "pvamu_gpa"
+              from          shrlgpa@prod x
+              where         x.shrlgpa_gpa_type_ind='O'
+              and           x.shrlgpa_levl_code='UG'
+              and           x.shrlgpa_pidm in(select "pidm" from a)),
+gpa4      as (select        x.shrtgpa_pidm"gpa4_pidm", x.shrtgpa_hours_attempted"smr21_hrs_attempt", x.shrtgpa_hours_earned"smr21_hrs_earned", to_char(x.shrtgpa_gpa,9.999)"smr21_gpa" 
+              from          shrtgpa@prod x
+              where         x.shrtgpa_gpa_type_ind='I'
+              and           x.shrtgpa_levl_code='UG'
+              and           x.shrtgpa_term_code='202130'  
+              and           x.shrtgpa_pidm in(select "pidm" from a)),
+gpa5      as (select        x.shrtgpa_pidm"gpa5_pidm", x.shrtgpa_hours_attempted"fal21_hrs_attempt", x.shrtgpa_hours_earned"fal21_hrs_earned", to_char(x.shrtgpa_gpa,9.999)"fal21_gpa" 
+              from          shrtgpa@prod x
+              where         x.shrtgpa_gpa_type_ind='I'
+              and           x.shrtgpa_levl_code='UG'
+              and           x.shrtgpa_term_code='202210' 
+              and           x.shrtgpa_pidm in(select "pidm" from a)), 
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a)), 
+enrl      as (select       "enrl_pidm", "enrld_term"
+        from (select        x.sfrstcr_pidm"enrl_pidm", x.sfrstcr_term_code"enrld_term", row_number()
+        over (partition by  x.sfrstcr_pidm
+              order by      x.sfrstcr_crn asc nulls last) rn
+              from          sfrstcr@prod x
+              where         x.sfrstcr_term_code='202220'
+  and exists (select        y.stvrsts_code from stvrsts y where y.stvrsts_code=x.sfrstcr_rsts_code and y.stvrsts_voice_type='R')) 
+              where         rn=1),                           
+astd      as (select       "astd_pidm","fal21_astd" 
+        from (select        x.shrttrm_pidm"astd_pidm", x.shrttrm_astd_code_end_of_term"fal21_astd", row_number() 
+        over (partition by  x.shrttrm_pidm order by x.shrttrm_term_code desc nulls last) rn
+              from          saturn.shrttrm@prod x
+              where         x.shrttrm_astd_code_end_of_term is not null
+              and           x.shrttrm_term_code='202210'
+              and           x.shrttrm_pidm in(select "pidm" from a)) 
+              where         rn=1),
+sat2      as (select       "sat2_pidm", "sat_2_score"
+        from (select        sat2.sortest_pidm"sat2_pidm", sat2.sortest_test_score"sat_2_score", row_number()
+        over (partition by  sat2.sortest_pidm 
+    order by  ltrim        (sat2.sortest_test_score,'0') desc nulls last) rn
+              from          saturn.sortest@prod sat2
+              where         sat2.sortest_tesc_code='S10' 
+              and           sat2.sortest_pidm in(select "pidm" from a))
+              where         rn=1), 
+act       as (select       "act_pidm", "act_score"
+        from (select        act.sortest_pidm"act_pidm", act.sortest_test_score"act_score", row_number()
+        over (partition by  act.sortest_pidm 
+    order by  ltrim        (act.sortest_test_score,'0') desc nulls last) rn
+              from          saturn.sortest@prod act
+              where         act.sortest_tesc_code='A05'  
+              and           act.sortest_pidm in(select "pidm" from a))
+              where         rn=1),
+hsch      as (select       "hsch_pidm", to_char("gpa",9.999)"hs_gpa"
+        from (select        x.sorhsch_pidm"hsch_pidm", x.sorhsch_gpa"gpa", row_number()
+        over (partition by  x.sorhsch_pidm
+    order by  to_char      (x.sorhsch_trans_recv_date,'yyyymmdd') desc nulls last) rn
+              from          sorhsch@prod x         
+              where         x.sorhsch_gpa is not null
+              and           x.sorhsch_pidm in(select "pidm" from a))
+              where         rn=1) 
+                                    
+      select               "cohort", "pvamu_id", "last_name", "first_name", "mi_name", "sex", "gender",  
+        case  when         "ethn" is not null then "ethn" else '7' end "ethn", 
+        case  when         "ethnicity" is not null then "ethnicity" else 'Race Unknown' end "ethnicity",
+                           "lvl", "clg", "majr",   
+             (select        stvmajr_desc from stvmajr where stvmajr_code="majr") "major", 
+                           "all_hrs_attempt", "all_hrs_earned", "pvamu_gpa", 
+                           "smr21_hrs_attempt", "smr21_hrs_earned", "smr21_gpa",
+                           "fal21_hrs_attempt", "fal21_hrs_earned", "fal21_gpa",
+                           "fal21_astd", 
+             (select        stvastd_desc from stvastd where stvastd_code="fal21_astd") "academic_standing",
+                           "enrld_term", 
+                           "sat_2_score", "act_score", "hs_gpa"
+
+        from  a 
+   left join  sex       on "sex_pidm"  = "pidm"   
+   left join  race      on "race_pidm" = "pidm"
+   left join  majr      on "majr_pidm" = "pidm"  
+   left join  gpa0      on "gpa0_pidm" = "pidm"  
+   left join  gpa4      on "gpa4_pidm" = "pidm"  
+   left join  gpa5      on "gpa5_pidm" = "pidm" 
+   left join  name      on "name_pidm" = "pidm"   
+   left join  enrl      on "enrl_pidm" = "pidm"
+   left join  astd      on "astd_pidm" = "pidm"
+   left join  sat2      on "sat2_pidm" = "pidm"
+   left join  act       on "act_pidm"  = "pidm" 
+   left join  hsch      on "hsch_pidm" = "pidm"
+
+    order by               "last_name", "first_name", "mi_name" ;
+
+
+/* sec 1.888 n 1,807 ----------------------------------------------------------------------------------------------------------------
+| Id  | Operation                      | Name                       | Rows  | Bytes |TempSpc| Cost (%CPU)| Time     | Inst   |IN-OUT|
+-------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT               |                            |  2227 |  1098K|       | 10429   (1)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID| STVMAJR                    |     1 |    26 |       |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6368PK_STVMAJR |     1 |       |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  SORT ORDER BY                 |                            |  2227 |  1098K|  1168K| 10429   (1)| 00:00:01 |        |      |
+|*  4 |   HASH JOIN OUTER              |                            |  2227 |  1098K|       | 10105   (1)| 00:00:01 |        |      |
+|*  5 |    HASH JOIN OUTER             |                            |  1995 |   750K|       |  7186   (1)| 00:00:01 |        |      |
+|*  6 |     HASH JOIN RIGHT OUTER      |                            |  1869 |   616K|       |  6764   (1)| 00:00:01 |        |      |
+|   7 |      REMOTE                    | SHRTGPA                    |   510 | 27030 |       |  1177   (1)| 00:00:01 |   PROD | R->S |
+|*  8 |      HASH JOIN RIGHT OUTER     |                            |  1868 |   519K|       |  5587   (1)| 00:00:01 |        |      |
+|*  9 |       VIEW                     |                            |  1897 | 91056 |       |   966   (1)| 00:00:01 |        |      |
+|* 10 |        WINDOW SORT PUSHED RANK |                            |  1897 |   113K|       |   966   (1)| 00:00:01 |        |      |
+|* 11 |         HASH JOIN RIGHT SEMI   |                            |  1897 |   113K|       |   965   (0)| 00:00:01 |        |      |
+|* 12 |          TABLE ACCESS FULL     | IR_V_COHORT                |  1882 | 22584 |       |   125   (0)| 00:00:01 |        |      |
+|  13 |          REMOTE                | SGBSTDN                    |  3128 |   149K|       |   840   (0)| 00:00:01 |   PROD | R->S |
+|* 14 |       HASH JOIN OUTER          |                            |  1868 |   432K|       |  4621   (1)| 00:00:01 |        |      |
+|* 15 |        HASH JOIN RIGHT OUTER   |                            |  1868 |   297K|       |  4088   (1)| 00:00:01 |        |      |
+|  16 |         VIEW                   |                            |  1882 | 80926 |       |  1609   (1)| 00:00:01 |        |      |
+|* 17 |          HASH JOIN RIGHT SEMI  |                            |  1882 | 54578 |       |  1609   (1)| 00:00:01 |        |      |
+|* 18 |           TABLE ACCESS FULL    | IR_V_COHORT                |  1882 | 22584 |       |   125   (0)| 00:00:01 |        |      |
+|  19 |           REMOTE               | SPBPERS                    |   449K|  7468K|       |  1482   (1)| 00:00:01 |   PROD | R->S |
+|* 20 |         HASH JOIN RIGHT OUTER  |                            |  1868 |   218K|       |  2479   (1)| 00:00:01 |        |      |
+|  21 |          REMOTE                | SHRTGPA                    |   510 | 27030 |       |  1177   (1)| 00:00:01 |   PROD | R->S |
+|* 22 |          HASH JOIN OUTER       |                            |  1868 |   122K|       |  1302   (1)| 00:00:01 |        |      |
+|* 23 |           TABLE ACCESS FULL    | IR_V_COHORT                |  1867 | 26138 |       |   125   (0)| 00:00:01 |        |      |
+|  24 |           REMOTE               | SHRTGPA                    |   510 | 27030 |       |  1177   (1)| 00:00:01 |   PROD | R->S |
+|* 25 |        VIEW                    |                            |  3938 |   284K|       |   533   (1)| 00:00:01 |        |      |
+|* 26 |         WINDOW SORT PUSHED RANK|                            |  3938 |   161K|       |   533   (1)| 00:00:01 |        |      |
+|* 27 |          HASH JOIN RIGHT SEMI  |                            |  3938 |   161K|       |   532   (1)| 00:00:01 |        |      |
+|* 28 |           TABLE ACCESS FULL    | IR_V_COHORT                |  1882 | 22584 |       |   125   (0)| 00:00:01 |        |      |
+|  29 |           TABLE ACCESS FULL    | IR_S_RACE_CERT             |   364K|    10M|       |   406   (1)| 00:00:01 |        |      |
+|  30 |     REMOTE                     | SHRLGPA                    | 20103 |   922K|       |   422   (1)| 00:00:01 |   PROD | R->S |
+|  31 |    REMOTE                      | SPRIDEN                    |   217K|    24M|       |  2918   (1)| 00:00:01 |   PROD | R->S |
+-------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
