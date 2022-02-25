@@ -1,0 +1,31 @@
+/*
+   ods
+   APPLICANTS
+   Summer and Fall 2021
+   F25FEB2022 \ 77k2b
+   */
+
+
+with a    as (select       "pidm", "applied_term", "lvl"
+        from (select        x.saradap_pidm"pidm", x.saradap_term_code_entry"applied_term", x.saradap_levl_code"lvl", row_number()
+        over (partition by  x.saradap_pidm || x.saradap_term_code_entry
+              order by      x.saradap_appl_no desc nulls last) rn
+              from          saturn.saradap@prod x
+              where         x.saradap_term_code_entry between '202130' and '202210')
+              where         rn=1)
+      select               "pidm", "applied_term", "lvl"
+        from  a ;
+
+
+/* ms 73 n 16,782 --------------------------------------------
+| Id  | Operation        | Name | Cost (%CPU)| Inst   |IN-OUT|
+--------------------------------------------------------------
+|   0 | SELECT STATEMENT |      |     0   (0)|        |      |
+|   1 |  REMOTE          |      |            |   PROD | R->S |
+--------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
