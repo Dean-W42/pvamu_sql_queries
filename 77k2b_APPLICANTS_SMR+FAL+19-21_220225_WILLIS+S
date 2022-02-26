@@ -1,0 +1,43 @@
+/*
+   ods
+   APPLICANTS
+   Spring, Summer and Fall 2019-2021
+   F25FEB2022 \ 77k2b
+   */
+
+
+with a    as (select       "pidm", "appno", "applied_term", "lvl"
+        from (select        x.saradap_pidm"pidm", x.saradap_appl_no"appno", x.saradap_term_code_entry"applied_term", x.saradap_levl_code"lvl", row_number()
+        over (partition by  x.saradap_pidm || x.saradap_term_code_entry
+              order by      x.saradap_appl_no desc nulls last) rn
+              from          saturn.saradap@prod x
+              where         x.saradap_term_code_entry between '201920' and '202210')
+              where         rn=1)
+      select               "pidm", "appno", "applied_term", 
+        case  when         "applied_term" between '201920' and '202010' then '2019'
+              when         "applied_term" between '202020' and '202110' then '2020'
+              when         "applied_term" between '202120' and '202210' then '2021' 
+              else          null end "year",
+             (select        stvterm_desc from stvterm where stvterm_code="applied_term") "applied",                  
+                           "lvl"
+        from  a 
+    order by               "pidm" asc, "lvl" asc, "appno" desc ;
+
+
+/* ms 266 62,061 ------------------------------------------------------------------------------------------------------------
+| Id  | Operation                      | Name                       | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+-----------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT               |                            |  3222 |   185K|  1426   (1)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID| STVTERM                    |     1 |    19 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6469PK_STVTERM |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  SORT ORDER BY                 |                            |  3222 |   185K|  1426   (1)| 00:00:01 |        |      |
+|*  4 |   VIEW                         |                            |  3222 |   185K|  1424   (1)| 00:00:01 |        |      |
+|*  5 |    WINDOW SORT PUSHED RANK     |                            |  3222 |   144K|  1424   (1)| 00:00:01 |        |      |
+|   6 |     REMOTE                     | SARADAP                    |  3222 |   144K|  1423   (1)| 00:00:01 |   PROD | R->S |
+-----------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
