@@ -1,0 +1,39 @@
+/*
+  ods
+  REJECTED FTFR FOR FALL 2022
+  After APDC Date of '02/16/22'
+  M28FEB2022 \ 77k1f
+  */
+
+
+with a    as (select       "pidm", "term", "lvl", "apst", "userid"
+        from (select        saradap_pidm"pidm", saradap_term_code_entry"term", saradap_levl_code"lvl", saradap_apst_code"apst", saradap_user_id"userid", row_number() 
+        over (partition by  saradap_pidm 
+              order by      saradap_appl_no desc nulls last) rn
+              from          saradap@prod
+              where         saradap_term_code_entry='202310' 
+  and exists (select        stvapst_code from stvapst where stvapst_code=saradap_apst_code and stvapst_code='D') 
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=saradap_levl_code and stvlevl_code='UG'))
+              where         rn=1), 
+b         as (select       "b_pidm", "b_term", "b_appno", "apdc", "apdc_date"
+        from (select        sarappd_pidm"b_pidm", sarappd_term_code_entry"b_term", sarappd_appl_no"b_appno", sarappd_apdc_code"apdc", to_char(sarappd_apdc_date,'mm/dd/yyyy')"apdc_date", row_number()
+        over (partition by  sarappd_pidm || sarappd_appl_no
+              order by      sarappd_seq_no desc nulls last) rn
+              from          sarappd@prod
+              where         sarappd_term_code_entry='202310'  
+              and           sarappd_apdc_date>to_date('02/16/22','mm/dd/yy')
+              and           sarappd_pidm in(select "pidm" from a))
+              where         rn=1
+              and          "apdc"='RJ')
+      select               "pidm", "term", "lvl", "apst", "apdc", "apdc_date", "userid"
+        from  a 
+  inner join  b             on "b_pidm"="pidm" ;
+
+
+/* ms 58 n 568
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
