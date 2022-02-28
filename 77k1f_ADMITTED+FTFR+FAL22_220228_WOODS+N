@@ -1,0 +1,30 @@
+/*
+  ods
+  ADMITTED FTFR FOR FALL 2022
+  After Activity Date of '02/16/22'
+  M28FEB2022 \ 77k1f
+  */
+
+
+with a    as (select        *
+              from          sgbstdn@prod
+              where         sgbstdn_term_code_eff='202310'
+              and           sgbstdn_levl_code='UG'
+              and           sgbstdn_styp_code='1' 
+              and           sgbstdn_activity_date>to_date('02/16/22','mm/dd/yy'))
+      select                *
+        from  a ;
+         
+
+/* ms 17 n 2,113
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+
+-- select * from sarappd@prod where sarappd_pidm=623475 ;
+-- select * from spriden@prod where spriden_change_ind is null and spriden_pidm=623475 ;
+
+
+###
