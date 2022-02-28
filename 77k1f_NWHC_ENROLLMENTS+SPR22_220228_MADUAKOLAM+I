@@ -1,0 +1,202 @@
+/*
+   ods
+   NWHC COURSE ENROLLMENTS FOR SPRING 2022
+   M28FEB2022 \ 77k1f
+   */
+
+
+with a    as (select        ssbsect_term_code"term", ssbsect_crn"crn", ssbsect_subj_code"subj", ssbsect_crse_numb"numb", ssbsect_seq_numb"sect", ssbsect_ssts_code"ssts", ssbsect_ptrm_code"ptrm", ssbsect_camp_code"campus",
+                            ssbsect_max_enrl"max_enrl", ssbsect_enrl"enrolled", ssbsect_seats_avail"available", ssbsect_crse_title"title_1"
+              from          ssbsect@prod
+              where         ssbsect_term_code='202220'  
+  and exists (select        stvcamp_code from stvcamp where stvcamp_code=ssbsect_camp_code and stvcamp_code in('IN','NC'))), 
+enrl      as (select        sfrstcr_crn"enrl_crn", sfrstcr_pidm"pidm", sfrstcr_rsts_code"rsts"
+              from          sfrstcr@prod
+              where         sfrstcr_term_code='202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and(stvrsts_auto_grade is not null or stvrsts_gradable_ind='Y'))
+              and           sfrstcr_crn in(select "crn" from a)),  
+name      as (select        spriden_pidm"name_pidm", spriden_id"pvamu_id", spriden_last_name"last_name", spriden_first_name"first_name", spriden_mi"mi_name"
+              from          spriden@prod
+              where         spriden_change_ind is null
+              and           spriden_entity_ind='P'
+              and           spriden_pidm in(select "pidm" from enrl)),
+crse      as (select       "crse_subj", "crse_numb", "clg", "dept", "title_2"
+        from (select        scbcrse_subj_code"crse_subj", scbcrse_crse_numb"crse_numb", scbcrse_coll_code"clg", scbcrse_dept_code"dept", scbcrse_title"title_2", row_number()
+        over (partition by  scbcrse_subj_code || scbcrse_crse_numb  
+              order by      scbcrse_eff_term desc nulls last) rn
+              from          scbcrse@prod
+              where         scbcrse_eff_term>='202210'
+  and exists (select        stvcsta_code from stvcsta where stvcsta_code=scbcrse_csta_code and stvcsta_code='A'))
+              where         rn=1), 
+inst      as (select        sirasgn_crn"inst_crn", spriden_pidm"inst_pidm", spriden_last_name||', '||spriden_first_name||' '||spriden_mi"instructor" 
+              from          sirasgn@prod                        
+              left join     spriden@prod on spriden_pidm=sirasgn_pidm and spriden_change_ind is null and spriden_entity_ind='P'
+              where         sirasgn_term_code='202220'   
+              and           sirasgn_primary_ind='Y'),  
+               
+pveml     as (select        distinct "pveml_pidm", coalesce(pv1,pv2,pv3,pv4,pv5)"pvamu_email"
+        from (select        sfrstcr_pidm "pveml_pidm",                                
+             (select       "pv1" from(select goremal_pidm"pv1_pidm", goremal_email_address"pv1" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv1_pidm"=sfrstcr_pidm) pv1,
+             (select       "pv2" from(select goremal_pidm"pv2_pidm", goremal_email_address"pv2" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv2_pidm"=sfrstcr_pidm) pv2,
+             (select       "pv3" from(select goremal_pidm"pv3_pidm", goremal_email_address"pv3" from goremal@prod where goremal_emal_code='FACU' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv3_pidm"=sfrstcr_pidm) pv3,
+             (select       "pv4" from(select goremal_pidm"pv4_pidm", goremal_email_address"pv4" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv4_pidm"=sfrstcr_pidm) pv4,             
+             (select       "pv5" from(select goremal_pidm"pv5_pidm", goremal_email_address"pv5" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='N') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv5_pidm"=sfrstcr_pidm) pv5
+              from          sfrstcr@prod   
+              where         sfrstcr_term_code='202220')), 
+preml     as (select       "preml_pidm", coalesce(pr1,pr2,pr3,pr4,pr5,pr6)"personal_email"
+        from (select        sfrstcr_pidm "preml_pidm",
+             (select       "pr1" from(select u.goremal_pidm"pr1_pidm", u.goremal_email_address"pr1", row_number() over(partition by u.goremal_pidm order by u.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod u where u.goremal_emal_code = 'TXCA' and u.goremal_status_ind = 'A' and u.goremal_preferred_ind = 'Y' and regexp_like(u.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and u.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr1_pidm"=sfrstcr_pidm) pr1,
+             (select       "pr2" from(select v.goremal_pidm"pr2_pidm", v.goremal_email_address"pr2", row_number() over(partition by v.goremal_pidm order by v.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod v where v.goremal_emal_code = 'PERS' and v.goremal_status_ind = 'A' and v.goremal_preferred_ind = 'Y' and regexp_like(v.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and v.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr2_pidm"=sfrstcr_pidm) pr2,  
+             (select       "pr3" from(select w.goremal_pidm"pr3_pidm", w.goremal_email_address"pr3", row_number() over(partition by w.goremal_pidm order by w.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod w where w.goremal_emal_code = 'ALUM' and w.goremal_status_ind = 'A' and w.goremal_preferred_ind = 'Y' and regexp_like(w.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and w.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr3_pidm"=sfrstcr_pidm) pr3,  
+             (select       "pr4" from(select x.goremal_pidm"pr4_pidm", x.goremal_email_address"pr4", row_number() over(partition by x.goremal_pidm order by x.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod x where x.goremal_emal_code = 'PERS' and x.goremal_status_ind = 'A' and x.goremal_preferred_ind = 'N' and regexp_like(x.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and x.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr4_pidm"=sfrstcr_pidm) pr4,   
+             (select       "pr5" from(select y.goremal_pidm"pr5_pidm", y.goremal_email_address"pr5", row_number() over(partition by y.goremal_pidm order by y.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod y where y.goremal_emal_code = 'TXCA' and y.goremal_status_ind = 'A' and y.goremal_preferred_ind = 'N' and regexp_like(y.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and y.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr5_pidm"=sfrstcr_pidm) pr5,
+             (select       "pr6" from(select z.goremal_pidm"pr6_pidm", z.goremal_email_address"pr6", row_number() over(partition by z.goremal_pidm order by z.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod z where z.goremal_emal_code = 'ISIR' and z.goremal_status_ind = 'A' and z.goremal_preferred_ind = 'N' and regexp_like(z.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and z.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr6_pidm"=sfrstcr_pidm) pr6
+              from          sfrstcr@prod   
+              where         sfrstcr_term_code='202220')),              
+cell      as (select       "cell_pidm",coalesce(c1,c2,c3,c4,c5,c6,c7)"cell_phone"       
+        from (select        sfrstcr_pidm "cell_pidm",               
+             (select       "c1" from(select t.sprtele_pidm"c1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"c1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('CE','CELL') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 
+              and          "c1_pidm"=sfrstcr_pidm) c1,
+             (select       "c2" from(select u.sprtele_pidm"c2_pidm",u.sprtele_phone_area"c2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('CE','CELL') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn = 1 
+              and          "c2_pidm"=sfrstcr_pidm) c2,
+             (select       "c3" from(select v.sprtele_pidm"c3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"c3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('CE','CELL') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 
+              and          "c3_pidm"=sfrstcr_pidm) c3,
+             (select       "c4" from(select w.sprtele_pidm"c4_pidm",w.sprtele_phone_area"c4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('CE','CELL') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 
+              and          "c4_pidm"=sfrstcr_pidm) c4,
+             (select       "c5" from(select x.sprtele_pidm"c5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"c5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('CE','CELL') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 
+              and          "c5_pidm"=sfrstcr_pidm) C5,
+             (select       "c6" from(select y.sprtele_pidm"c6_pidm",substr(y.sprtele_phone_number,-10)"c6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('CE','CELL') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 
+              and          "c6_pidm"=sfrstcr_pidm) c6,
+             (select       "c7" from(select z.sprtele_pidm"c7_pidm",z.sprtele_phone_number"c7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('CE','CELL') and regexp_like(z.sprtele_phone_number,'^\d{10}$')) where rn=1 
+              and          "c7_pidm"=sfrstcr_pidm) c7
+              from          sfrstcr@prod  
+              where         sfrstcr_term_code='202220')),
+home      as (select       "home_pidm",coalesce(h1,h2,h3,h4,h5,h6,h7,h8)"home_phone"      
+        from (select        sfrstcr_pidm "home_pidm",   
+             (select       "h1" from(select t.sprtele_pidm"h1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"h1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 
+              and          "h1_pidm"=sfrstcr_pidm) h1,
+             (select       "h2" from(select u.sprtele_pidm"h2_pidm",u.sprtele_phone_area"h2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn=1 
+              and          "h2_pidm"=sfrstcr_pidm) h2,
+             (select       "h3" from(select v.sprtele_pidm"h3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"h3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 
+              and          "h3_pidm"=sfrstcr_pidm) h3,
+             (select       "h4" from(select w.sprtele_pidm"h4_pidm",w.sprtele_phone_area"h4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 
+              and          "h4_pidm"=sfrstcr_pidm) h4,
+             (select       "h5" from(select x.sprtele_pidm"h5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"h5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 
+              and          "h5_pidm"=sfrstcr_pidm) h5,
+             (select       "h6" from(select y.sprtele_pidm"h6_pidm",substr(y.sprtele_phone_number,-10)"h6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 
+              and          "h6_pidm"=sfrstcr_pidm) h6,
+             (select       "h7" from(select z.sprtele_pidm"h7_pidm",z.sprtele_phone_number"h7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(z.sprtele_phone_number, '^\d{10}$')) where rn=1 
+              and          "h7_pidm"=sfrstcr_pidm) h7,            
+             (select       "h8" from(select a.sprtele_pidm"h8_pidm",substr(a.sprtele_phone_area,1,4)||a.sprtele_phone_number"h8",row_number() over(partition by a.sprtele_pidm order by a.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod a where a.sprtele_status_ind is null and a.sprtele_atyp_code='AA' and regexp_like(a.sprtele_phone_area,'^\d{6}$') and regexp_like(a.sprtele_phone_number,'^\d{6}$')) where rn=1 
+              and          "h8_pidm"=sfrstcr_pidm) h8
+              from          sfrstcr@prod  
+              where         sfrstcr_term_code='202220'))
+                             
+      select  distinct     "term",
+             (select        stvterm_desc from stvterm where stvterm_code="term") "semester",
+                           "pvamu_id", "last_name", "first_name", "mi_name",
+                           "pvamu_email", "personal_email", "cell_phone", "home_phone",
+                           "rsts", "subj", "numb", "sect", "crn", 
+              coalesce    ("title_1","title_2") "course_title", 
+                           "instructor",
+             (select        stvssts_desc from stvssts where stvssts_code="ssts") "status",                           
+                           "ptrm",
+             (select        stvptrm_desc from stvptrm where stvptrm_code="ptrm") "ptrm_desc",
+                           "campus", 
+             (select        stvcamp_desc from stvcamp where stvcamp_code="campus") "campus"
+
+        from  a     
+   left join  enrl      on "enrl_crn"="crn"  
+   left join  name      on "name_pidm"="pidm"
+   left join  crse      on "crse_subj"="subj" and "crse_numb"="numb" 
+   left join  inst      on "inst_crn"="crn" 
+   left join  pveml     on "pveml_pidm"="pidm"   
+   left join  preml     on "preml_pidm"="pidm" 
+   left join  cell      on "cell_pidm"="pidm" 
+   left join  home      on "home_pidm"="pidm" 
+
+    order by               "last_name", "first_name", "mi_name", "crn" ;
+
+
+/* ms 97 n 43 ---------------------------------------------------------------------------------------------------------------
+| Id  | Operation                      | Name                       | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+-----------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT               |                            |    15 | 15615 | 19837   (1)| 00:00:02 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID| STVTERM                    |     1 |    19 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6469PK_STVTERM |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  MAT_VIEW ACCESS BY INDEX ROWID| STVSSTS                    |     1 |    10 |     1   (0)| 00:00:01 |        |      |
+|*  4 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6444PK_STVSSTS |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   5 |  NESTED LOOPS                  |                            |     1 |    74 |     3   (0)| 00:00:01 |        |      |
+|*  6 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|   7 |   REMOTE                       | GOREMAL                    |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|   8 |    NESTED LOOPS                |                            |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|   9 |     NESTED LOOPS               |                            |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 10 |      INDEX UNIQUE SCAN         | SYS_C_SNAP$_6259PK_STVCITZ |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 11 |      INDEX UNIQUE SCAN         | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  12 |     REMOTE                     | GOREMAL                    |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  13 |      NESTED LOOPS              |                            |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  14 |       NESTED LOOPS             |                            |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 15 |        INDEX UNIQUE SCAN       | SYS_C_SNAP$_6259PK_STVCITZ |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 16 |        INDEX UNIQUE SCAN       | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  17 |       REMOTE                   | GOREMAL                    |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  18 |        NESTED LOOPS            |                            |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  19 |         NESTED LOOPS           |                            |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 20 |          INDEX UNIQUE SCAN     | SYS_C_SNAP$_6259PK_STVCITZ |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 21 |          INDEX UNIQUE SCAN     | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  22 |         REMOTE                 | GOREMAL                    |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  23 |          NESTED LOOPS          |                            |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  24 |           NESTED LOOPS         |                            |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 25 |            INDEX UNIQUE SCAN   | SYS_C_SNAP$_6259PK_STVCITZ |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 26 |            INDEX UNIQUE SCAN   | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  27 |           REMOTE               | GOREMAL                    |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  28 |  MAT_VIEW ACCESS BY INDEX ROWID| STVPTRM                    |     1 |    18 |     1   (0)| 00:00:01 |        |      |
+|* 29 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6397PK_STVPTRM |     1 |       |     0   (0)| 00:00:01 |        |      |
+|  30 |  MAT_VIEW ACCESS BY INDEX ROWID| STVCAMP                    |     1 |    24 |     1   (0)| 00:00:01 |        |      |
+|* 31 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6261PK_STVCAMP |     1 |       |     0   (0)| 00:00:01 |        |      |
+|  32 |  MAT_VIEW ACCESS BY INDEX ROWID| STVCAMP                    |     1 |    24 |     1   (0)| 00:00:01 |        |      |
+|* 33 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6261PK_STVCAMP |     1 |       |     0   (0)| 00:00:01 |        |      |
+|  34 |  MAT_VIEW ACCESS BY INDEX ROWID| STVBLDG                    |     1 |    31 |     1   (0)| 00:00:01 |        |      |
+|* 35 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6243PK_STVBLDG |     1 |       |     0   (0)| 00:00:01 |        |      |
+|  36 |  SORT ORDER BY                 |                            |    15 | 15615 | 19837   (1)| 00:00:02 |        |      |
+|* 37 |   HASH JOIN OUTER              |                            |    15 | 15615 | 19815   (1)| 00:00:02 |        |      |
+|  38 |    JOIN FILTER CREATE          | :BF0000                    |    15 | 11550 |  3298   (1)| 00:00:01 |        |      |
+|* 39 |     HASH JOIN OUTER            |                            |    15 | 11550 |  3298   (1)| 00:00:01 |        |      |
+|* 40 |      HASH JOIN OUTER           |                            |    15 |  5655 |   147   (1)| 00:00:01 |        |      |
+|* 41 |       HASH JOIN OUTER          |                            |    15 |  4395 |   107   (1)| 00:00:01 |        |      |
+|  42 |        NESTED LOOPS            |                            |    15 |  2700 |    49   (0)| 00:00:01 |        |      |
+|  43 |         REMOTE                 | SSBSECT                    |   143 | 25311 |    49   (0)| 00:00:01 |   PROD | R->S |
+|* 44 |         INDEX UNIQUE SCAN      | SYS_C_SNAP$_6261PK_STVCAMP |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|* 45 |        VIEW                    |                            |    68 |  7684 |    58   (2)| 00:00:01 |        |      |
+|* 46 |         WINDOW SORT PUSHED RANK|                            |    68 |  8160 |    58   (2)| 00:00:01 |        |      |
+|  47 |          NESTED LOOPS          |                            |    68 |  8160 |    57   (0)| 00:00:01 |        |      |
+|* 48 |           INDEX UNIQUE SCAN    | SYS_C_SNAP$_6286PK_STVCSTA |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  49 |           REMOTE               | SCBCRSE                    |    68 |  8024 |    57   (0)| 00:00:01 |   PROD | R->S |
+|  50 |       VIEW                     |                            |  1362 |   111K|    40   (0)| 00:00:01 |        |      |
+|  51 |        REMOTE                  | SSRMEET                    |  1362 |   146K|    40   (0)| 00:00:01 |   PROD | R->S |
+|  52 |      VIEW                      |                            |  1494 |   573K|  3155   (1)| 00:00:01 |        |      |
+|  53 |       REMOTE                   |                            |       |       |            |          |   PROD | R->S |
+|  54 |    VIEW                        |                            |   870 |   230K| 16516   (1)| 00:00:02 |        |      |
+|  55 |     HASH UNIQUE                |                            |   870 | 23490 | 16516   (1)| 00:00:02 |        |      |
+|  56 |      JOIN FILTER USE           | :BF0000                    |  1342 | 36234 |     9   (0)| 00:00:01 |        |      |
+|  57 |       REMOTE                   | SIRASGN                    |  1342 | 36234 |     9   (0)| 00:00:01 |   PROD | R->S |
+----------------------------------------------------------------------------------------------------------------------------- 
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+--  SELECT * FROM scbcrse@prod WHERE scbcrse_eff_term='202210' ;
+
+
+###
