@@ -1,0 +1,117 @@
+/*
+ ods
+ FTE CALCULATION for FALL SEMESTER
+ T01MAR2022 | 77j5e
+ 
+ Fall 2021: n = 9,353 fte = 8,754
+ Fall 2020: n = 9,248 fte = 8,742
+ Fall 2019: n = 8,940 fte = 8,508
+ Fall 2018: n = 9,516 fte = 9,078
+ */
+
+ variable  term  varchar2(6) 
+ exec     :term  := '202110' ; 
+
+ WITH a AS    (SELECT        szrcbm1_pidm"pidm",
+ CASE          WHEN          szrcbm1_clas_code='7' THEN 'DR'
+               WHEN          szrcbm1_clas_code='6' THEN 'GR'
+               WHEN          szrcbm1_clas_code='5' THEN 'PB'
+               ELSE         'UG' END "LVL", 
+ CASE          WHEN          szrcbm1_clas_code>4 AND Sum(szrcbm1_univ_on_cmp_sch+szrcbm1_univ_off_cmp_sch)>8 THEN 'Full-Time'
+               WHEN          szrcbm1_clas_code<5 AND Sum(szrcbm1_univ_on_cmp_sch+szrcbm1_univ_off_cmp_sch)>11 THEN 'Full-Time'
+               ELSE         'Part-Time' END "STATUS",
+               Sum          (szrcbm1_univ_on_cmp_sch+szrcbm1_univ_off_cmp_sch )"sch"
+               FROM          pvamuir.ir_c_szrcbm1
+               INNER JOIN    stvterm 
+               ON            stvterm_code=szrcbm1_term_code
+               AND           stvterm_code=:term    
+               WHERE         szrcbm1_term_code=:term
+ AND           REGEXP_LIKE  (szrcbm1_term_code,:term)
+ AND EXISTS   (SELECT        stvterm_code FROM stvterm WHERE stvterm_code=szrcbm1_term_code AND stvterm_code=:term)
+               GROUP BY      szrcbm1_pidm,szrcbm1_clas_code),
+
+ b AS         (SELECT       "LVL","STATUS",Count("pidm")"enrol",Sum("sch")"hours",
+(CASE          WHEN         "STATUS"='Full-Time' THEN Count("pidm")
+               WHEN         "STATUS"='Part-Time' AND "LVL" IN('DR','GR','PB') THEN Trunc(Sum("sch")/9,0)
+               WHEN         "STATUS"='Part-Time' AND "LVL"='UG' THEN Trunc(Sum("sch")/12,0)
+               ELSE          NULL END)"calculated"
+               FROM          a
+               GROUP BY     "LVL","STATUS")
+
+ SELECT        Nvl        (("LVL"),'TOTAL') AS "LVL","STATUS",
+               Sum         ("enrol")"ENROL",
+               Sum         ("hours")"HOURS",
+               Sum         ("calculated")"CALCULATED"
+
+ FROM                        b
+
+ GROUP BY      ROLLUP      ("LVL","STATUS")
+
+ ORDER BY      CASE      
+               WHEN         "LVL"='DR' THEN 1
+               WHEN         "LVL"='GR' THEN 2
+               WHEN         "LVL"='PB' THEN 3
+               WHEN         "LVL"='UG' THEN 4
+               ELSE          5 END,"STATUS";
+
+/* n = 9,516 fte = 9,078
+
+     with a as ( select     enrld_pidm "pidm",
+                            enrld_level "LVL",
+                            enrld_status "STATUS",
+                            enrld_sem_sch "sch"
+          from              pvamuir.ir_v_daily_enrldetail          
+    inner join              saturn.stvterm 
+                     on     stvterm_code = enrld_term 
+                    and     stvterm_code = '201910'    
+         where              enrld_term = '201910'
+        and regexp_like (   enrld_term,'201910' )
+    and exists ( select     stvterm_code
+                   from     saturn.stvterm
+                  where     stvterm_code = enrld_term 
+                    and     stvterm_code = '201910' )
+                    and     version_key = '4' 
+        and regexp_like (   version_key,'4' )),
+          b as ( select    "LVL","STATUS",
+                            count ( "pidm" ) "enrol",
+                            sum ( "sch" ) "hours",
+        ( case     when    "STATUS" = 'Full-Time' then count ( "pidm" )
+                   when    "STATUS" = 'Part-Time' and "LVL" in ( 'DR','GR','PB' ) then trunc ( sum ( "sch" ) / 9,0 )
+                   when    "STATUS" = 'Part-Time' and "LVL" = 'UG' then trunc ( sum ( "sch" ) / 12,0 )
+                   else     null end ) "calculated"
+          from              a
+      group by             "LVL","STATUS" )
+        select      nvl (( "LVL" ), 'TOTAL' )
+                     as    "LVL","STATUS",
+                    sum (  "enrol" ) "ENROL",
+                    sum (  "hours" ) "HOURS",
+                    sum (  "calculated" ) "CALCULATED"
+          from              b
+      group by   rollup (  "LVL","STATUS" )
+      order by     case     when "LVL" = 'DR' then 1
+                            when "LVL" = 'GR' then 2
+                            when "LVL" = 'PB' then 3
+                            when "LVL" = 'UG' then 4
+                            else  5 end,
+                           "STATUS" ;
+                          
+/* 333 ms n = 12
+-------------------------------------------------------------------------------------------------
+| Id  | Operation               | Name                  | Rows  | Bytes | Cost (%CPU)| Time     |
+-------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT        |                       |     1 |    52 |  3006   (1)| 00:00:43 |
+|   1 |  SORT ORDER BY          |                       |     1 |    52 |  3006   (1)| 00:00:43 |
+|   2 |   SORT GROUP BY ROLLUP  |                       |     1 |    52 |  3006   (1)| 00:00:43 |
+|   3 |    VIEW                 |                       |     1 |    52 |  3005   (1)| 00:00:43 |
+|   4 |     HASH GROUP BY       |                       |     1 |    44 |  3005   (1)| 00:00:43 |
+|*  5 |      HASH JOIN          |                       |     1 |    44 |  3004   (1)| 00:00:43 |
+|   6 |       NESTED LOOPS      |                       |     1 |    14 |     0   (0)| 00:00:01 |
+|*  7 |        INDEX UNIQUE SCAN| PK_STVTERM            |     1 |     7 |     0   (0)| 00:00:01 |
+|*  8 |        INDEX UNIQUE SCAN| PK_STVTERM            |     1 |     7 |     0   (0)| 00:00:01 |
+|*  9 |       TABLE ACCESS FULL | IR_V_DAILY_ENRLDETAIL |    22 |   660 |  3004   (1)| 00:00:43 |
+-------------------------------------------------------------------------------------------------
+--  SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--  explain plan for
+
+
+###
