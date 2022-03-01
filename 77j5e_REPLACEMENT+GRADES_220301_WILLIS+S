@@ -1,0 +1,81 @@
+/*
+   ods
+   REPLACEMENT GRADES
+   Previously Received a FN Grade then Retook the Course and Passed
+   T01MAR2022 \ 77j5e
+   */
+
+
+with a    as (select        shrtckn_pidm"pidm", shrtckn_term_code"term", shrtckn_seq_no"seqno", shrtckn_crn"crn", shrtckn_subj_code"subj", shrtckn_crse_numb"numb"
+              from          shrtckn@prod
+              where         shrtckn_term_code between '202020' and '202210'), 
+grde      as (select       "grde_pidm", "grde_term", "grde_seqno", "grade_seq", "grade" 
+        from (select        shrtckg_pidm"grde_pidm", shrtckg_term_code"grde_term", shrtckg_tckn_seq_no"grde_seqno", shrtckg_seq_no"grade_seq", shrtckg_grde_code_final"grade"
+              from          shrtckg@prod
+              where         shrtckg_term_code between '202020' and '202210')
+              where        "grade"='FN'), 
+repl      as (select        shrtckn_pidm"repl_pidm", shrtckn_term_code"repl_term", shrtckn_seq_no"repl_seqno", shrtckn_subj_code"repl_subj", shrtckn_crse_numb"repl_numb"
+              from          shrtckn@prod
+              inner join    a on "pidm"=shrtckn_pidm and "subj"=shrtckn_subj_code and "numb"=shrtckn_crse_numb
+              where         shrtckn_term_code between '202030' and '202130'),
+grd2      as (select       "grd2_pidm", "grd2_term", "grd2_seqno", "grad2_seq", "grade_2"                                                                                   
+        from (select        shrtckg_pidm"grd2_pidm", shrtckg_term_code"grd2_term", shrtckg_tckn_seq_no"grd2_seqno", shrtckg_seq_no"grad2_seq", shrtckg_grde_code_final"grade_2", row_number()
+        over (partition by  shrtckg_pidm || shrtckg_term_code || shrtckg_tckn_seq_no
+              order by      shrtckg_seq_no desc nulls last) rn 
+              from          shrtckg@prod
+              where         shrtckg_term_code between '202020' and '202210')  
+              where         rn=1 
+              and          "grade_2" in('A','B','C','D')), 
+rep3      as (select        shrtckn_pidm"rep3_pidm", shrtckn_term_code"rep3_term", shrtckn_seq_no"rep3_seqno", tccns_subj"tccns_subj", tccns_numb"tccns_numb", pv_subj"rep3_subj", pv_numb"rep3_numb"
+              from          shrtckn@prod
+              inner join    pvamuir.ir_v_tccns on tccns_subj=shrtckn_subj_code and tccns_numb=shrtckn_crse_numb and tccns_term_code='202210'
+              inner join    a on "pidm"=shrtckn_pidm and "subj"=pv_subj and "numb"=pv_numb and "term"<'202210'
+              where         shrtckn_term_code='202210'),
+grd3      as (select       "grd3_pidm", "grd3_term", "grd3_seqno", "grad3_seq", "grade_3"                                                                                   
+        from (select        shrtckg_pidm"grd3_pidm", shrtckg_term_code"grd3_term", shrtckg_tckn_seq_no"grd3_seqno", shrtckg_seq_no"grad3_seq", shrtckg_grde_code_final"grade_3", row_number()
+        over (partition by  shrtckg_pidm || shrtckg_term_code || shrtckg_tckn_seq_no
+              order by      shrtckg_seq_no desc nulls last) rn 
+              from          shrtckg@prod
+              where         shrtckg_term_code='202210')  
+              where         rn=1 
+              and          "grade_3" in('A','B','C','D')),
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a))
+
+      select               "pidm", 
+                           "pvamu_id", "last_name", "first_name", "mi_name",
+                           "term",
+             (select        stvterm_desc from stvterm where stvterm_code="term") "semester",      
+                           "seqno", "crn", "subj", "numb", "grade",
+                           "repl_term", 
+             (select        stvterm_desc from stvterm where stvterm_code="repl_term") "semester",                            
+                           "repl_subj", "repl_numb", "grade_2",
+                           "rep3_term", 
+             (select        stvterm_desc from stvterm where stvterm_code="rep3_term") "semester",                            
+                           "tccns_subj", "tccns_numb", "grade_3"
+
+        from  a 
+  inner join  grde      on "grde_pidm"="pidm" and "grde_term"="term" and "grde_seqno"="seqno" 
+   left join  repl      on "repl_pidm"="pidm" and "repl_subj"="subj" and "repl_numb"="numb" and "repl_term">"term" 
+   left join  grd2      on "grd2_pidm"="pidm" and "grd2_term"="repl_term" and "grd2_seqno"="repl_seqno" 
+   left join  rep3      on "rep3_pidm"="pidm" and "rep3_subj"="subj" and "rep3_numb"="numb" and "rep3_term">"term"
+   left join  grd3      on "grd3_pidm"="pidm" and "grd3_term"="rep3_term" and "grd3_seqno"="rep3_seqno" 
+   left join  name      on "name_pidm" = "pidm" ;
+--  ner join (select       "xx
+
+
+
+/*
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+-- select distinct tccns_term_code from pvamuir.ir_v_tccns order by tccns_term_code desc ;
+-- new term is '202210'
+
+
+###
