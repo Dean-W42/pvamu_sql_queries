@@ -1,0 +1,180 @@
+/*
+   ods
+   EMAILS 
+   Enrolled Majors in Architecture, Business, and Education
+   W02MAR2022 \ 77j5d
+   */
+    
+
+with a    as (select       "pidm"
+        from (select        sfrstcr_pidm"pidm", row_number()   
+        over (partition by  sfrstcr_pidm
+              order by      sfrstcr_crn asc nulls last) rn
+              from          sfrstcr@prod
+              where         sfrstcr_term_code='202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and stvrsts_voice_type='R'))
+              where         rn=1),    
+coll      as (select       "coll_pidm", "clg"
+        from (select        sgbstdn_pidm"coll_pidm", sgbstdn_coll_code_1"clg", row_number()
+        over (partition by  sgbstdn_pidm
+              order by      sgbstdn_term_code_eff desc nulls last) rn
+              from          sgbstdn@prod
+              where         sgbstdn_term_code_eff between '200910' and '202220'
+              and           sgbstdn_pidm in(select "pidm" from a))
+              where         rn=1
+              and          "clg" in('AR','BU','ED')),
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a)),
+pveml     as (select        distinct "pveml_pidm", coalesce(pv1,pv2,pv3,pv4,pv5)"pvamu_email"
+        from (select        sfrstcr_pidm "pveml_pidm",                                
+             (select       "pv1" from(select goremal_pidm"pv1_pidm", goremal_email_address"pv1" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv1_pidm"=sfrstcr_pidm) pv1,
+             (select       "pv2" from(select goremal_pidm"pv2_pidm", goremal_email_address"pv2" from goremal@prod where goremal_emal_code='PVEM' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv2_pidm"=sfrstcr_pidm) pv2,
+             (select       "pv3" from(select goremal_pidm"pv3_pidm", goremal_email_address"pv3" from goremal@prod where goremal_emal_code='FACU' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv3_pidm"=sfrstcr_pidm) pv3,
+             (select       "pv4" from(select goremal_pidm"pv4_pidm", goremal_email_address"pv4" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='Y') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv4_pidm"=sfrstcr_pidm) pv4,             
+             (select       "pv5" from(select goremal_pidm"pv5_pidm", goremal_email_address"pv5" from goremal@prod where goremal_emal_code='UNIV' and exists(select stvcitz_code from stvcitz where stvcitz_code=goremal_preferred_ind and stvcitz_code='N') and exists(select stvcsta_code from stvcsta where stvcsta_code=goremal_status_ind and stvcsta_code='A')) 
+              where        "pv5_pidm"=sfrstcr_pidm) pv5
+              from          sfrstcr@prod   
+              where         sfrstcr_term_code='202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and stvrsts_voice_type='R'))),
+preml     as (select       "preml_pidm", coalesce(pr1,pr2,pr3,pr4,pr5,pr6)"personal_email"
+        from (select        sfrstcr_pidm "preml_pidm",
+             (select       "pr1" from(select u.goremal_pidm"pr1_pidm", u.goremal_email_address"pr1", row_number() over(partition by u.goremal_pidm order by u.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod u where u.goremal_emal_code = 'TXCA' and u.goremal_status_ind = 'A' and u.goremal_preferred_ind = 'Y' and regexp_like(u.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and u.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr1_pidm"=sfrstcr_pidm) pr1,
+             (select       "pr2" from(select v.goremal_pidm"pr2_pidm", v.goremal_email_address"pr2", row_number() over(partition by v.goremal_pidm order by v.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod v where v.goremal_emal_code = 'PERS' and v.goremal_status_ind = 'A' and v.goremal_preferred_ind = 'Y' and regexp_like(v.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and v.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr2_pidm"=sfrstcr_pidm) pr2,  
+             (select       "pr3" from(select w.goremal_pidm"pr3_pidm", w.goremal_email_address"pr3", row_number() over(partition by w.goremal_pidm order by w.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod w where w.goremal_emal_code = 'ALUM' and w.goremal_status_ind = 'A' and w.goremal_preferred_ind = 'Y' and regexp_like(w.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and w.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr3_pidm"=sfrstcr_pidm) pr3,  
+             (select       "pr4" from(select x.goremal_pidm"pr4_pidm", x.goremal_email_address"pr4", row_number() over(partition by x.goremal_pidm order by x.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod x where x.goremal_emal_code = 'PERS' and x.goremal_status_ind = 'A' and x.goremal_preferred_ind = 'N' and regexp_like(x.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and x.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr4_pidm"=sfrstcr_pidm) pr4,   
+             (select       "pr5" from(select y.goremal_pidm"pr5_pidm", y.goremal_email_address"pr5", row_number() over(partition by y.goremal_pidm order by y.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod y where y.goremal_emal_code = 'TXCA' and y.goremal_status_ind = 'A' and y.goremal_preferred_ind = 'N' and regexp_like(y.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and y.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr5_pidm"=sfrstcr_pidm) pr5,
+             (select       "pr6" from(select z.goremal_pidm"pr6_pidm", z.goremal_email_address"pr6", row_number() over(partition by z.goremal_pidm order by z.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod z where z.goremal_emal_code = 'ISIR' and z.goremal_status_ind = 'A' and z.goremal_preferred_ind = 'N' and regexp_like(z.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and z.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 
+              and          "pr6_pidm"=sfrstcr_pidm) pr6
+              from          sfrstcr@prod   
+              where         sfrstcr_term_code='202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and stvrsts_voice_type='R')))
+
+      select               "pvamu_id", "last_name", "first_name", "mi_name", "clg", 
+             (select        stvcoll_desc from stvcoll where stvcoll_code="clg") "college",
+                           "pvamu_email", "personal_email"
+
+        from  a 
+  inner join  coll      on "coll_pidm"="pidm" 
+   left join  name      on "name_pidm"="pidm" 
+   left join  pveml     on "pveml_pidm"="pidm" 
+   left join  preml     on "preml_pidm"="pidm" ;
+
+
+/* sec 4.412 n 3,048 -------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |  3408 |  3281K|   570K (14)| 00:00:45 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVCOLL                     |     1 |    23 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6278PK_STVCOLL  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  NESTED LOOPS                            |                             |     1 |    74 |     3   (0)| 00:00:01 |        |      |
+|*  4 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6286PK_STVCSTA  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|   5 |   REMOTE                                 | GOREMAL                     |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|   6 |    NESTED LOOPS                          |                             |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|   7 |     NESTED LOOPS                         |                             |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|*  8 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6259PK_STVCITZ  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|*  9 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6286PK_STVCSTA  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  10 |     REMOTE                               | GOREMAL                     |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  11 |      NESTED LOOPS                        |                             |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  12 |       NESTED LOOPS                       |                             |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 13 |        INDEX UNIQUE SCAN                 | SYS_C_SNAP$_6259PK_STVCITZ  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 14 |        INDEX UNIQUE SCAN                 | SYS_C_SNAP$_6286PK_STVCSTA  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  15 |       REMOTE                             | GOREMAL                     |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  16 |        NESTED LOOPS                      |                             |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  17 |         NESTED LOOPS                     |                             |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 18 |          INDEX UNIQUE SCAN               | SYS_C_SNAP$_6259PK_STVCITZ  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 19 |          INDEX UNIQUE SCAN               | SYS_C_SNAP$_6286PK_STVCSTA  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  20 |         REMOTE                           | GOREMAL                     |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|  21 |          NESTED LOOPS                    |                             |     1 |    76 |     3   (0)| 00:00:01 |        |      |
+|  22 |           NESTED LOOPS                   |                             |     1 |     4 |     0   (0)| 00:00:01 |        |      |
+|* 23 |            INDEX UNIQUE SCAN             | SYS_C_SNAP$_6259PK_STVCITZ  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|* 24 |            INDEX UNIQUE SCAN             | SYS_C_SNAP$_6286PK_STVCSTA  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|  25 |           REMOTE                         | GOREMAL                     |     1 |    72 |     3   (0)| 00:00:01 |   PROD | R->S |
+|* 26 |  VIEW                                    |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 27 |   WINDOW SORT PUSHED RANK                |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  28 |    REMOTE                                | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 29 |   VIEW                                   |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 30 |    WINDOW SORT PUSHED RANK               |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  31 |     REMOTE                               | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 32 |    VIEW                                  |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 33 |     WINDOW SORT PUSHED RANK              |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  34 |      REMOTE                              | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 35 |     VIEW                                 |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 36 |      WINDOW SORT PUSHED RANK             |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  37 |       REMOTE                             | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 38 |      VIEW                                |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 39 |       WINDOW SORT PUSHED RANK            |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  40 |        REMOTE                            | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 41 |       VIEW                               |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 42 |        WINDOW SORT PUSHED RANK           |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  43 |         REMOTE                           | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  44 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|  45 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D7DC2_15283F5D |       |       |            |          |        |      |
+|* 46 |    VIEW                                  |                             | 12756 |   323K|   945   (1)| 00:00:01 |        |      |
+|* 47 |     WINDOW SORT PUSHED RANK              |                             | 12756 |   622K|   945   (1)| 00:00:01 |        |      |
+|* 48 |      HASH JOIN                           |                             | 12756 |   622K|   944   (0)| 00:00:01 |        |      |
+|* 49 |       MAT_VIEW ACCESS FULL               | STVRSTS                     |     9 |    45 |     3   (0)| 00:00:01 |        |      |
+|  50 |       REMOTE                             | SFRSTCR                     | 29763 |  1307K|   941   (0)| 00:00:01 |   PROD | R->S |
+|* 51 |   HASH JOIN OUTER                        |                             |  3408 |  3281K|   569K (14)| 00:00:45 |        |      |
+|* 52 |    HASH JOIN OUTER                       |                             |  3062 |  1755K|   566K (14)| 00:00:45 |        |      |
+|* 53 |     HASH JOIN OUTER                      |                             |  3062 |   944K|   189K  (1)| 00:00:15 |        |      |
+|  54 |      JOIN FILTER CREATE                  | :BF0000                     |  3062 |   134K|   910   (1)| 00:00:01 |        |      |
+|* 55 |       HASH JOIN                          |                             |  3062 |   134K|   910   (1)| 00:00:01 |        |      |
+|* 56 |        VIEW                              |                             |  3062 | 97984 |   901   (1)| 00:00:01 |        |      |
+|* 57 |         WINDOW SORT PUSHED RANK          |                             |  3062 |   137K|   901   (1)| 00:00:01 |        |      |
+|* 58 |          HASH JOIN SEMI                  |                             |  3062 |   137K|   900   (0)| 00:00:01 |        |      |
+|  59 |           REMOTE                         | SGBSTDN                     |  3062 |    98K|   891   (0)| 00:00:01 |   PROD | R->S |
+|  60 |           VIEW                           | VW_NSO_2                    | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  61 |            VIEW                          |                             | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  62 |             TABLE ACCESS FULL            | SYS_TEMP_0FD9D7DC2_15283F5D | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  63 |        VIEW                              |                             | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  64 |         TABLE ACCESS FULL                | SYS_TEMP_0FD9D7DC2_15283F5D | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  65 |      VIEW                                |                             | 12756 |  3375K|   188K  (1)| 00:00:15 |        |      |
+|  66 |       HASH UNIQUE                        |                             | 12756 |   473K|   188K  (1)| 00:00:15 |        |      |
+|  67 |        JOIN FILTER USE                   | :BF0000                     | 12756 |   473K|   944   (0)| 00:00:01 |        |      |
+|* 68 |         HASH JOIN                        |                             | 12756 |   473K|   944   (0)| 00:00:01 |        |      |
+|* 69 |          MAT_VIEW ACCESS FULL            | STVRSTS                     |     9 |    45 |     3   (0)| 00:00:01 |        |      |
+|  70 |          REMOTE                          | SFRSTCR                     | 29763 |   959K|   941   (0)| 00:00:01 |   PROD | R->S |
+|  71 |     VIEW                                 |                             | 12756 |  3375K|   376K (20)| 00:00:30 |        |      |
+|* 72 |      HASH JOIN                           |                             | 12756 |   473K|   944   (0)| 00:00:01 |        |      |
+|* 73 |       MAT_VIEW ACCESS FULL               | STVRSTS                     |     9 |    45 |     3   (0)| 00:00:01 |        |      |
+|  74 |       REMOTE                             | SFRSTCR                     | 29763 |   959K|   941   (0)| 00:00:01 |   PROD | R->S |
+|  75 |    VIEW                                  |                             | 14199 |  5532K|  3151   (1)| 00:00:01 |        |      |
+|* 76 |     HASH JOIN RIGHT SEMI                 |                             | 14199 |  1844K|  3151   (1)| 00:00:01 |        |      |
+|  77 |      VIEW                                | VW_NSO_1                    | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  78 |       VIEW                               |                             | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  79 |        TABLE ACCESS FULL                 | SYS_TEMP_0FD9D7DC2_15283F5D | 12756 |   161K|     9   (0)| 00:00:01 |        |      |
+|  80 |      REMOTE                              | SPRIDEN                     |   235K|    27M|  3142   (1)| 00:00:01 |   PROD | R->S |
+---------------------------------------------------------------------------------------------------------------------------------------- 
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+From: Asghar, Midhat  
+Sent: Wednesday, March 2, 2022 12:20 PM
+To: Williamson, Dean 
+Subject: Info Request: Student List
+
+Dr. Williamson,
+
+We need a report/list of all students that are taking any course in the following Colleges, 
+
+"	College of Education
+"	College of Business
+"	School of Architecture
+
+Is it possible to get a list (email, name) per college (listed above)?
+
+
+###
