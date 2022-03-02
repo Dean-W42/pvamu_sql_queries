@@ -1,0 +1,39 @@
+/*
+   ods
+   HAZLEWOOOD EXEMPTIONS
+   Fall 2021
+   W02MAR2022 \ 77j5d
+   */
+
+
+with a    as (select        tbraccd_pidm"pidm", tbraccd_detail_code"detail", tbraccd_desc"exemption", sum(tbraccd_amount)"amount"
+              from          tbraccd@prod
+              where         tbraccd_term_code='202210'
+              and           tbraccd_detail_code in('EW02','EW03','EW04','EW49','EW51') 
+      having  sum          (tbraccd_amount) > 0
+              group by      tbraccd_pidm, tbraccd_detail_code, tbraccd_desc)
+
+      select               "pidm", "detail", "exemption", "amount"
+
+        from  a ;
+
+
+/* sec 1.544 n 401 ---------------------------------------------------------------------------------------------------
+| Id  | Operation                             | Name                | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |
+----------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT REMOTE               |                     |   146 |  6424 | 21052   (1)| 00:00:01 |        |
+|*  1 |  FILTER                               |                     |       |       |            |          |        |
+|   2 |   HASH GROUP BY                       |                     |   146 |  6424 | 21052   (1)| 00:00:01 |        |
+|   3 |    TABLE ACCESS BY INDEX ROWID BATCHED| TBRACCD             |  2913 |   125K| 21051   (1)| 00:00:01 |   PROD |
+|*  4 |     INDEX SKIP SCAN                   | TBRACCD_APPL_INDEX2 |  2913 |       | 20226   (1)| 00:00:01 |   PROD |
+----------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+--  select distinct tbraccd_detail_code,tbraccd_desc from tbraccd@prod where tbraccd_term_code='202210' and tbraccd_detail_code like '%EW%' and tbraccd_desc like '%Vet%' ;
+-- 'EW02','EW03','EW04','EW49','EW51'
+
+
+###
