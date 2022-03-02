@@ -1,0 +1,82 @@
+/*
+   ods
+   DECEASED STUDENTS
+   Spring 2019 to Spring 2022
+   W02MAR2022 \ 77j5d
+   */
+
+
+with a    as (select        spbpers_pidm"pidm", spbpers_dead_ind"dead", to_char(spbpers_dead_date,'mm/dd/yyyy')"deceased"
+              from          spbpers@prod
+              where         spbpers_dead_ind='Y'),  
+enrl      as (select       "enrl_pidm", "first_term"
+        from (select        sfrstcr_pidm"enrl_pidm", sfrstcr_term_code"first_term", row_number()
+        over (partition by  sfrstcr_pidm
+              order by      sfrstcr_term_code asc nulls last) rn
+              from          sfrstcr@prod
+              where         sfrstcr_term_code between '201920' and '202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and(stvrsts_auto_grade is not null or stvrsts_gradable_ind='Y')))
+              where         rn=1),
+enr2      as (select       "enr2_pidm", "last_term"
+        from (select        sfrstcr_pidm"enr2_pidm", sfrstcr_term_code"last_term", row_number()
+        over (partition by  sfrstcr_pidm
+              order by      sfrstcr_term_code desc nulls last) rn
+              from          sfrstcr@prod
+              where         sfrstcr_term_code between '201920' and '202220'
+  and exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and(stvrsts_auto_grade is not null or stvrsts_gradable_ind='Y')))
+              where         rn=1),
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a))
+      select               "pvamu_id", "last_name", "first_name", "mi_name", 
+                           "dead", "deceased", "first_term", 
+             (select        stvterm_desc from stvterm where stvterm_code="first_term") "first_semester",
+                           "last_term",
+             (select        stvterm_desc from stvterm where stvterm_code="last_term") "last_semester"
+        from  a 
+  inner join  enrl      on "enrl_pidm"="pidm" 
+   left join  enr2      on "enr2_pidm"="pidm" 
+   left join  name      on "name_pidm"="pidm" ;   
+
+
+/* sec 1.92 n 8 --------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes |TempSpc| Cost (%CPU)| Time     | Inst   |IN-OUT|
+------------------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |  5374 |  2718K|       |  8888   (1)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVTERM                     |     1 |    19 |       |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6469PK_STVTERM  |     1 |       |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVTERM                     |     1 |    19 |       |     1   (0)| 00:00:01 |        |      |
+|*  4 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6469PK_STVTERM  |     1 |       |       |     0   (0)| 00:00:01 |        |      |
+|   5 |  TEMP TABLE TRANSFORMATION               |                             |       |       |       |            |          |        |      |
+|   6 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D7DB8_15283F5D |       |       |       |            |          |        |      |
+|   7 |    REMOTE                                | SPBPERS                     |  4133 |   104K|       |  1483   (1)| 00:00:01 |   PROD | R->S |
+|*  8 |   HASH JOIN OUTER                        |                             |  5374 |  2718K|       |  7401   (1)| 00:00:01 |        |      |
+|*  9 |    HASH JOIN OUTER                       |                             |  4827 |   560K|       |  4255   (1)| 00:00:01 |        |      |
+|* 10 |     HASH JOIN                            |                             |  4467 |   344K|       |  2129   (1)| 00:00:01 |        |      |
+|  11 |      VIEW                                |                             |  4133 |   157K|       |     4   (0)| 00:00:01 |        |      |
+|  12 |       TABLE ACCESS FULL                  | SYS_TEMP_0FD9D7DB8_15283F5D |  4133 |   104K|       |     4   (0)| 00:00:01 |        |      |
+|* 13 |      VIEW                                |                             | 37440 |  1462K|       |  2125   (1)| 00:00:01 |        |      |
+|* 14 |       WINDOW SORT PUSHED RANK            |                             | 37440 |  1462K|  1936K|  2125   (1)| 00:00:01 |        |      |
+|* 15 |        HASH JOIN                         |                             | 37440 |  1462K|       |  1884   (1)| 00:00:01 |        |      |
+|* 16 |         MAT_VIEW ACCESS FULL             | STVRSTS                     |    13 |    91 |       |     3   (0)| 00:00:01 |        |      |
+|  17 |         REMOTE                           | SFRSTCR                     | 59526 |  1918K|       |  1880   (0)| 00:00:01 |   PROD | R->S |
+|* 18 |     VIEW                                 |                             | 37440 |  1462K|       |  2125   (1)| 00:00:01 |        |      |
+|* 19 |      WINDOW SORT PUSHED RANK             |                             | 37440 |  1462K|  1936K|  2125   (1)| 00:00:01 |        |      |
+|* 20 |       HASH JOIN                          |                             | 37440 |  1462K|       |  1884   (1)| 00:00:01 |        |      |
+|* 21 |        MAT_VIEW ACCESS FULL              | STVRSTS                     |    13 |    91 |       |     3   (0)| 00:00:01 |        |      |
+|  22 |        REMOTE                            | SFRSTCR                     | 59526 |  1918K|       |  1880   (0)| 00:00:01 |   PROD | R->S |
+|  23 |    VIEW                                  |                             |  4601 |  1792K|       |  3146   (1)| 00:00:01 |        |      |
+|* 24 |     HASH JOIN RIGHT SEMI                 |                             |  4601 |   597K|       |  3146   (1)| 00:00:01 |        |      |
+|  25 |      VIEW                                | VW_NSO_1                    |  4133 | 53729 |       |     4   (0)| 00:00:01 |        |      |
+|  26 |       VIEW                               |                             |  4133 | 53729 |       |     4   (0)| 00:00:01 |        |      |
+|  27 |        TABLE ACCESS FULL                 | SYS_TEMP_0FD9D7DB8_15283F5D |  4133 |   104K|       |     4   (0)| 00:00:01 |        |      |
+|  28 |      REMOTE                              | SPRIDEN                     |   235K|    27M|       |  3142   (1)| 00:00:01 |   PROD | R->S |
+------------------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
