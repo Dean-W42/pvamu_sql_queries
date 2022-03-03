@@ -1,0 +1,15 @@
+
+--  select * from spriden@prod where spriden_id='P22102803' ;
+--  Megan Howell 619312
+--  Zanyece Harris-Wright 579277 (NTWOODS)
+--  select * from spbpers@prod where spbpers_pidm in(619312,579277) ;
+--  select * from gobintl@prod where gobintl_pidm in(619312,579277) ;
+--  select * from spraddr@prod where spraddr_pidm in(619312,579277) ; 
+--  select * from sorhsch@prod where sorhsch_pidm in(619312,579277) ; 
+--  select * from stvsbgi where stvsbgi_code in('826345','440002')  ; 
+--  select * from sobsbgi where sobsbgi_sbgi_code='826345' ;
+--  select * from rcrapp1@prod where rcrapp1_pidm in(619312,579277) ;
+--  select * from goremal@prod where goremal_pidm in(619312,579277) ; 
+--  select * from sprtele@prod where sprtele_pidm in(619312,579277) ;
+
+###
