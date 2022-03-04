@@ -1,0 +1,133 @@
+/*
+   ods
+   COHORT 2020
+   Academic Standing
+   Attempted, Earned, GPA Hours, Quality Points, GPA
+   Summer 2020 to Summer 2021
+   F04MAR2022 \ 77j5b
+   */
+
+
+with a    as (select        cohort"cohort", cohort_term_code"term", cohort_pidm"pidm"
+              from          pvamuir.ir_v_cohort
+              where         cohort='CO2020'
+              and           cohort_ftftfr='Y'), 
+
+astd      as (select       "astd_pidm", "astd"
+        from (select        shrttrm_pidm"astd_pidm", shrttrm_astd_code_end_of_term"astd", row_number()
+        over (partition by  shrttrm_pidm
+              order by      shrttrm_term_code desc nulls last) rn
+              from          shrttrm@prod
+              where         shrttrm_term_code between '202030' and '202130'
+              and           shrttrm_astd_code_end_of_term is not null
+              and           shrttrm_pidm in(select "pidm" from a))
+              where         rn=1),
+
+hrs1      as (select        shrtgpa_pidm"hrs1_pidm", shrtgpa_hours_attempted"smr20_attempted", shrtgpa_hours_earned"smr20_earned", shrtgpa_gpa_hours"smr20_gpa_hrs", shrtgpa_quality_points"smr20_gpa_pts", to_char(shrtgpa_gpa,9.999)"smr20_gpa"
+              from          shrtgpa@prod
+              where         shrtgpa_levl_code='UG'
+              and           shrtgpa_gpa_type_ind='I'
+              and           shrtgpa_term_code='202030' 
+              and           shrtgpa_pidm in(select "pidm" from a)),
+
+hrs2      as (select        shrtgpa_pidm"hrs2_pidm", shrtgpa_hours_attempted"fal20_attempted", shrtgpa_hours_earned"fal20_earned", shrtgpa_gpa_hours"fal20_gpa_hrs", shrtgpa_quality_points"fal20_gpa_pts", to_char(shrtgpa_gpa,9.999)"fal20_gpa"
+              from          shrtgpa@prod
+              where         shrtgpa_levl_code='UG'
+              and           shrtgpa_gpa_type_ind='I'
+              and           shrtgpa_term_code='202110' 
+              and           shrtgpa_pidm in(select "pidm" from a)),
+
+hrs3      as (select        shrtgpa_pidm"hrs3_pidm", shrtgpa_hours_attempted"spr21_attempted", shrtgpa_hours_earned"spr21_earned", shrtgpa_gpa_hours"spr21_gpa_hrs", shrtgpa_quality_points"spr21_gpa_pts", to_char(shrtgpa_gpa,9.999)"spr21_gpa"
+              from          shrtgpa@prod
+              where         shrtgpa_levl_code='UG'
+              and           shrtgpa_gpa_type_ind='I'
+              and           shrtgpa_term_code='202120' 
+              and           shrtgpa_pidm in(select "pidm" from a)),
+
+hrs4      as (select        shrtgpa_pidm"hrs4_pidm", shrtgpa_hours_attempted"smr21_attempted", shrtgpa_hours_earned"smr21_earned", shrtgpa_gpa_hours"smr21_gpa_hrs", shrtgpa_quality_points"smr21_gpa_pts", to_char(shrtgpa_gpa,9.999)"smr21_gpa"
+              from          shrtgpa@prod
+              where         shrtgpa_levl_code='UG'
+              and           shrtgpa_gpa_type_ind='I'
+              and           shrtgpa_term_code='202130' 
+              and           shrtgpa_pidm in(select "pidm" from a))
+
+      select               "cohort", 
+             (select        stvterm_desc from stvterm where stvterm_code="term") "semester",
+             (select        spriden_id from spriden@prod where spriden_change_ind is null and spriden_entity_ind='P' and spriden_pidm="pidm") "pvamu_id",
+                           "astd", 
+             (select        stvastd_desc from stvastd where stvastd_code="astd") "academic_standing",
+                           "smr20_attempted", "smr20_earned", "smr20_gpa_pts", "smr20_gpa_hrs", "smr20_gpa",
+                           "fal20_attempted", "fal20_earned", "fal20_gpa_pts", "fal20_gpa_hrs", "fal20_gpa",
+                           "spr21_attempted", "spr21_earned", "spr21_gpa_pts", "spr21_gpa_hrs", "spr21_gpa",
+                           "smr21_attempted", "smr21_earned", "smr21_gpa_pts", "smr21_gpa_hrs", "smr21_gpa"
+
+        from  a   
+
+   left join  astd      on "astd_pidm"="pidm"
+
+   left join  hrs1      on "hrs1_pidm"="pidm" 
+
+   left join  hrs2      on "hrs2_pidm"="pidm"
+    
+   left join  hrs3      on "hrs3_pidm"="pidm"
+
+   left join  hrs4      on "hrs4_pidm"="pidm" ;
+
+
+/* ms 271 n 1,807 ----------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |  2014 |   765K|  9233   (1)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVTERM                     |     1 |    19 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6469PK_STVTERM  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  REMOTE                                  | SPRIDEN                     |     1 |    41 |     4   (0)| 00:00:01 |   PROD | R->S |
+|   4 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVASTD                     |     1 |    25 |     1   (0)| 00:00:01 |        |      |
+|*  5 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6255PK_STVASTD  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   6 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|   7 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D7E62_15283F5D |       |       |            |          |        |      |
+|*  8 |    TABLE ACCESS FULL                     | IR_V_COHORT                 |  1867 | 39207 |   125   (0)| 00:00:01 |        |      |
+|*  9 |   HASH JOIN RIGHT OUTER                  |                             |  2014 |   765K|  5053   (1)| 00:00:01 |        |      |
+|* 10 |    VIEW                                  |                             |  1887 | 60384 |   330   (1)| 00:00:01 |        |      |
+|* 11 |     WINDOW SORT PUSHED RANK              |                             |  1887 | 71706 |   330   (1)| 00:00:01 |        |      |
+|* 12 |      HASH JOIN RIGHT SEMI                |                             |  1887 | 71706 |   329   (0)| 00:00:01 |        |      |
+|  13 |       VIEW                               | VW_NSO_5                    |  1867 |  9335 |     3   (0)| 00:00:01 |        |      |
+|  14 |        VIEW                              |                             |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  15 |         TABLE ACCESS FULL                | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+|  16 |       REMOTE                             | SHRTTRM                     |  2167 | 71511 |   326   (0)| 00:00:01 |   PROD | R->S |
+|* 17 |    HASH JOIN RIGHT OUTER                 |                             |  1867 |   650K|  4723   (1)| 00:00:01 |        |      |
+|  18 |     VIEW                                 |                             |   510 | 40290 |  1180   (1)| 00:00:01 |        |      |
+|* 19 |      HASH JOIN SEMI                      |                             |   510 | 33660 |  1180   (1)| 00:00:01 |        |      |
+|  20 |       REMOTE                             | SHRTGPA                     |   510 | 27030 |  1177   (1)| 00:00:01 |   PROD | R->S |
+|  21 |       VIEW                               | VW_NSO_1                    |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  22 |        VIEW                              |                             |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  23 |         TABLE ACCESS FULL                | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+|* 24 |     HASH JOIN RIGHT OUTER                |                             |  1867 |   506K|  3543   (1)| 00:00:01 |        |      |
+|  25 |      VIEW                                |                             |   510 | 40290 |  1180   (1)| 00:00:01 |        |      |
+|* 26 |       HASH JOIN SEMI                     |                             |   510 | 33660 |  1180   (1)| 00:00:01 |        |      |
+|  27 |        REMOTE                            | SHRTGPA                     |   510 | 27030 |  1177   (1)| 00:00:01 |   PROD | R->S |
+|  28 |        VIEW                              | VW_NSO_2                    |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  29 |         VIEW                             |                             |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  30 |          TABLE ACCESS FULL               | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+|* 31 |      HASH JOIN RIGHT OUTER               |                             |  1867 |   362K|  2363   (1)| 00:00:01 |        |      |
+|  32 |       VIEW                               |                             |   510 | 40290 |  1180   (1)| 00:00:01 |        |      |
+|* 33 |        HASH JOIN SEMI                    |                             |   510 | 33660 |  1180   (1)| 00:00:01 |        |      |
+|  34 |         REMOTE                           | SHRTGPA                     |   510 | 27030 |  1177   (1)| 00:00:01 |   PROD | R->S |
+|  35 |         VIEW                             | VW_NSO_3                    |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  36 |          VIEW                            |                             |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  37 |           TABLE ACCESS FULL              | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+|* 38 |       HASH JOIN RIGHT OUTER              |                             |  1867 |   218K|  1183   (1)| 00:00:01 |        |      |
+|  39 |        VIEW                              |                             |   510 | 40290 |  1180   (1)| 00:00:01 |        |      |
+|* 40 |         HASH JOIN SEMI                   |                             |   510 | 33660 |  1180   (1)| 00:00:01 |        |      |
+|  41 |          REMOTE                          | SHRTGPA                     |   510 | 27030 |  1177   (1)| 00:00:01 |   PROD | R->S |
+|  42 |          VIEW                            | VW_NSO_4                    |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  43 |           VIEW                           |                             |  1867 | 24271 |     3   (0)| 00:00:01 |        |      |
+|  44 |            TABLE ACCESS FULL             | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+|  45 |        VIEW                              |                             |  1867 | 76547 |     3   (0)| 00:00:01 |        |      |
+|  46 |         TABLE ACCESS FULL                | SYS_TEMP_0FD9D7E62_15283F5D |  1867 | 35473 |     3   (0)| 00:00:01 |        |      |
+---------------------------------------------------------------------------------------------------------------------------------------- 
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
