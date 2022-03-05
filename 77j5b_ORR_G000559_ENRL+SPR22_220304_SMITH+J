@@ -1,0 +1,158 @@
+/*
+   ods
+   ORR G000559
+   Enrolled Spring 2022 \ DOB \ Major \ Phones \ Emails \ Addresses
+   F04MAR2022 \ 77j5b
+   */
+
+
+with a    as (select       "pidm"
+        from (select        x.sfrstcr_pidm"pidm", row_number()
+        over (partition by  x.sfrstcr_pidm
+              order by      x.sfrstcr_crn asc nulls last) rn
+              from          sfrstcr@prod x
+              where         x.sfrstcr_term_code='202220'
+  and exists (select        y.stvrsts_code from stvrsts y where y.stvrsts_code=x.sfrstcr_rsts_code and y.stvrsts_voice_type='R')
+  and exists (select        z.spbpers_pidm from spbpers@prod z where z.spbpers_pidm=x.sfrstcr_pidm and(z.spbpers_confid_ind is null or z.spbpers_confid_ind='N')))
+              where         rn=1),
+               
+majr      as (select       "majr_pidm", "majr"
+        from (select        x.sgbstdn_pidm"majr_pidm", x.sgbstdn_majr_code_1"majr", row_number()
+        over (partition by  x.sgbstdn_pidm
+              order by      x.sgbstdn_term_code_eff desc nulls last) rn
+              from          sgbstdn@prod x
+              where         x.sgbstdn_term_code_eff between '200910' and '202220'
+              and           x.sgbstdn_pidm in(select "pidm" from a))
+              where         rn=1),
+
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a)),
+
+cell      as (select       "cell_pidm", coalesce(c1,c2,c3,c4,c5,c6,c7)"cell_phone"       
+        from (select       "pidm" "cell_pidm",               
+             (select       "c1" from(select t.sprtele_pidm"c1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"c1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('CE','CELL') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 and "c1_pidm"="pidm") c1,
+             (select       "c2" from(select u.sprtele_pidm"c2_pidm",u.sprtele_phone_area"c2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('CE','CELL') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn = 1 and "c2_pidm"="pidm") c2,
+             (select       "c3" from(select v.sprtele_pidm"c3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"c3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('CE','CELL') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 and "c3_pidm"="pidm") c3,
+             (select       "c4" from(select w.sprtele_pidm"c4_pidm",w.sprtele_phone_area"c4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('CE','CELL') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 and "c4_pidm"="pidm") c4,
+             (select       "c5" from(select x.sprtele_pidm"c5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"c5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('CE','CELL') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 and "c5_pidm"="pidm") C5,
+             (select       "c6" from(select y.sprtele_pidm"c6_pidm",substr(y.sprtele_phone_number,-10)"c6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('CE','CELL') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 and "c6_pidm"="pidm") c6,
+             (select       "c7" from(select z.sprtele_pidm"c7_pidm",z.sprtele_phone_number"c7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('CE','CELL') and regexp_like(z.sprtele_phone_number,'^\d{10}$')) where rn=1 and "c7_pidm"="pidm") c7
+              from          a)),
+
+home      as (select       "home_pidm", coalesce(h1,h2,h3,h4,h5,h6,h7,h8)"home_phone"      
+        from (select       "pidm" "home_pidm",   
+             (select       "h1" from(select t.sprtele_pidm"h1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"h1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 and "h1_pidm"="pidm") h1,
+             (select       "h2" from(select u.sprtele_pidm"h2_pidm",u.sprtele_phone_area"h2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn=1 and "h2_pidm"="pidm") h2,
+             (select       "h3" from(select v.sprtele_pidm"h3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"h3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 and "h3_pidm"="pidm") h3,
+             (select       "h4" from(select w.sprtele_pidm"h4_pidm",w.sprtele_phone_area"h4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 and "h4_pidm"="pidm") h4,
+             (select       "h5" from(select x.sprtele_pidm"h5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"h5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 and "h5_pidm"="pidm") h5,
+             (select       "h6" from(select y.sprtele_pidm"h6_pidm",substr(y.sprtele_phone_number,-10)"h6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 and "h6_pidm"="pidm") h6,
+             (select       "h7" from(select z.sprtele_pidm"h7_pidm",z.sprtele_phone_number"h7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(z.sprtele_phone_number, '^\d{10}$')) where rn=1 and "h7_pidm"="pidm") h7,            
+             (select       "h8" from(select a.sprtele_pidm"h8_pidm",substr(a.sprtele_phone_area,1,4)||a.sprtele_phone_number"h8",row_number() over(partition by a.sprtele_pidm order by a.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod a where a.sprtele_status_ind is null and a.sprtele_atyp_code='AA' and regexp_like(a.sprtele_phone_area,'^\d{6}$') and regexp_like(a.sprtele_phone_number,'^\d{6}$')) where rn=1 and "h8_pidm"="pidm") h8
+              from          a)),
+
+pvem      as (select       "pvem_pidm", coalesce(pv1,pv2,pv3,pv4)"pvamu_email"
+        from (select       "pidm" "pvem_pidm",                                
+             (select       "pv1" from(select w.goremal_pidm"pv1_pidm", w.goremal_email_address"pv1" from general.goremal@prod w where w.goremal_emal_code = 'PVEM' and w.goremal_status_ind = 'A') where "pv1_pidm" = "pidm") pv1,
+             (select       "pv2" from(select x.goremal_pidm"pv2_pidm", x.goremal_email_address"pv2" from general.goremal@prod x where x.goremal_emal_code = 'UNIV' and x.goremal_preferred_ind = 'Y' and x.goremal_status_ind = 'A') where "pv2_pidm" = "pidm") pv2,
+             (select       "pv3" from(select y.goremal_pidm"pv3_pidm", y.goremal_email_address"pv3" from general.goremal@prod y where y.goremal_emal_code = 'FACU' and y.goremal_preferred_ind = 'Y' and y.goremal_status_ind = 'A') where "pv3_pidm" = "pidm") pv3,
+             (select       "pv4" from(select z.goremal_pidm"pv4_pidm", z.goremal_email_address"pv4" from general.goremal@prod z where z.goremal_emal_code = 'UNIV' and z.goremal_preferred_ind = 'N' and z.goremal_status_ind = 'A') where "pv4_pidm" = "pidm") pv4
+              from          a)),
+
+prem      as (select       "prem_pidm", coalesce(pr1,pr2,pr3,pr4,pr5,pr6)"personal_email"
+        from (select       "pidm" "prem_pidm",
+             (select       "pr1" from(select u.goremal_pidm"pr1_pidm", u.goremal_email_address"pr1", row_number() over(partition by u.goremal_pidm order by u.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod u where u.goremal_emal_code = 'TXCA' and u.goremal_status_ind = 'A' and u.goremal_preferred_ind = 'Y' and regexp_like(u.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and u.goremal_user_id <> 'AXIOMAUTOUPLOAD' and u.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr1_pidm" = "pidm") pr1,
+             (select       "pr2" from(select v.goremal_pidm"pr2_pidm", v.goremal_email_address"pr2", row_number() over(partition by v.goremal_pidm order by v.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod v where v.goremal_emal_code = 'PERS' and v.goremal_status_ind = 'A' and v.goremal_preferred_ind = 'Y' and regexp_like(v.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and v.goremal_user_id <> 'AXIOMAUTOUPLOAD' and v.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr2_pidm" = "pidm") pr2,  
+             (select       "pr3" from(select w.goremal_pidm"pr3_pidm", w.goremal_email_address"pr3", row_number() over(partition by w.goremal_pidm order by w.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod w where w.goremal_emal_code = 'ALUM' and w.goremal_status_ind = 'A' and w.goremal_preferred_ind = 'Y' and regexp_like(w.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and w.goremal_user_id <> 'AXIOMAUTOUPLOAD' and w.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr3_pidm" = "pidm") pr3,  
+             (select       "pr4" from(select x.goremal_pidm"pr4_pidm", x.goremal_email_address"pr4", row_number() over(partition by x.goremal_pidm order by x.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod x where x.goremal_emal_code = 'PERS' and x.goremal_status_ind = 'A' and x.goremal_preferred_ind = 'N' and regexp_like(x.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and x.goremal_user_id <> 'AXIOMAUTOUPLOAD' and x.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr4_pidm" = "pidm") pr4,   
+             (select       "pr5" from(select y.goremal_pidm"pr5_pidm", y.goremal_email_address"pr5", row_number() over(partition by y.goremal_pidm order by y.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod y where y.goremal_emal_code = 'TXCA' and y.goremal_status_ind = 'A' and y.goremal_preferred_ind = 'N' and regexp_like(y.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and y.goremal_user_id <> 'AXIOMAUTOUPLOAD' and y.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr5_pidm" = "pidm") pr5,
+             (select       "pr6" from(select z.goremal_pidm"pr6_pidm", z.goremal_email_address"pr6", row_number() over(partition by z.goremal_pidm order by z.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod z where z.goremal_emal_code = 'ISIR' and z.goremal_status_ind = 'A' and z.goremal_preferred_ind = 'N' and regexp_like(z.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and z.goremal_user_id <> 'AXIOMAUTOUPLOAD' and z.goremal_pidm in(select "pidm" from a)) where rn=1 and "pr6_pidm" = "pidm") pr6
+              from          a)),
+
+addh      as (select       "addh_pidm", "home_street", "home_city", "home_st", "home_zip"     
+        from (select        spraddr_pidm"addh_pidm", spraddr_street_line1||' '||spraddr_street_line2||' '||spraddr_street_line3"home_street", spraddr_city"home_city", spraddr_stat_code"home_st", spraddr_zip"home_zip", row_number() 
+        over (partition by  spraddr_pidm 
+    order by  to_char      (spraddr_activity_date,'yyyymmdd') desc nulls last, spraddr_surrogate_id desc nulls last) rn 
+              from          saturn.spraddr@prod 
+              where         spraddr_atyp_code in('AA','BI','FA','MA')  
+              and           spraddr_status_ind is null 
+              and           spraddr_pidm in(select "pidm" from a)) 
+              where         rn=1),
+            
+addm      as (select       "addm_pidm", "mail_street", "mail_city", "mail_st", "mail_zip"     
+        from (select        spraddr_pidm"addm_pidm", spraddr_street_line1||' '||spraddr_street_line2||' '||spraddr_street_line3"mail_street", spraddr_city"mail_city", spraddr_stat_code"mail_st", spraddr_zip"mail_zip", row_number() 
+        over (partition by  spraddr_pidm 
+    order by  to_char      (spraddr_activity_date,'yyyymmdd') desc nulls last, spraddr_surrogate_id desc nulls last) rn 
+              from          saturn.spraddr@prod 
+              where         spraddr_atyp_code in('AA','AB','AD','AH','AS','BI','BU','FA','MA','PA')  
+              and           spraddr_status_ind is null 
+              and           spraddr_pidm in(select "pidm" from a)) 
+              where         rn=1)              
+
+
+      select               "last_name", "first_name", "mi_name",
+     (select  to_char      (spbpers_birth_date,'mm/dd/yyyy') from spbpers@prod where spbpers_pidm="pidm") "date_of_birth",
+             (select        stvmajr_desc from stvmajr where stvmajr_code="majr") "major", 
+                           "cell_phone", "home_phone",
+                           "pvamu_email", "personal_email",
+                           "home_street", "home_city", "home_st", "home_zip",   
+                           "mail_street", "mail_city", "mail_st", "mail_zip" 
+
+
+        from  a 
+
+   left join  majr      on "majr_pidm"="pidm" 
+
+   left join  name      on "name_pidm"="pidm" 
+
+   left join  cell      on "cell_pidm"="pidm" 
+
+   left join  home      on "home_pidm"="pidm"  
+
+   left join  pvem      on "pvem_pidm"="pidm" 
+
+   left join  prem      on "prem_pidm"="pidm" 
+
+   left join  addh      on "addh_pidm"="pidm"
+
+   left join  addm      on "addm_pidm"="pidm" ;
+
+
+/* sec 44.92 n 8,182 
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+Activity Information
+Activity Assigned Staff: Carl Dean Williamson
+Activity Type: Simple To Do
+Activity Due Date: 3/10/2022
+Activity Details: Under the Texas Public Information Act, Tex. Gov’t Code §552.001 et seq., I am requesting the student directory information for all Spring 2022 Prairie View A&M University students, with the following fields for each: Name, major, home and mailing addresses, phone numbers, date of birth, and email addresses. Description of Record Requested: Under the Texas Public Information Act, Tex. Gov’t Code §552.001 et seq., I am requesting the student directory information for all Spring 2022 Prairie View A&M University students, with the following fields for each: Name, major, home and mailing addresses, phone numbers, date of birth, and email addresses. Summary of Request: Under the Texas Public Information Act, Tex. Gov’t Code §552.001 et seq., I am requesting the student directory information for all Spring 2022 Prairie View A&M University students, with the following fields for each: Name, major, home and mailing addresses, phone numbers, date of birth, and email addresses. 
+
+Overview of the Request
+Public Information Records # G000559-030222
+Assigned Staff: Jamie Smith
+
+Description of Record Requested: Under the Texas Public Information Act, Tex. Gov’t Code §552.001 et seq., 
+I am requesting the student directory information for all Spring 2022 Prairie View A'M University students, with the following fields for each: 
+
+x Name
+x date of birth  
+x major
+x phone numbers 
+x email addresses
+x home and mailing addresses 
+
+
+Summary of Request: Under the Texas Public Information Act, Tex. Gov’t Code §552.001 et seq., 
+I am requesting the student directory information for all Spring 2022 Prairie View A'M University students, with the following fields for each: 
+Name, major, home and mailing addresses, phone numbers, date of birth, and email addresses.
+
+Clarification(s)(if any): Clarification requested 3/2 Clarification received 3/3 New due date 3/17
+
+
+###
