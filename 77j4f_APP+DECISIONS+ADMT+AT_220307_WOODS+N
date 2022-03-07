@@ -1,0 +1,57 @@
+/*
+     ods
+     APPLICATION DECISIONS FOR ADMT OF AT
+     M07MAR2022 \ 77j4f
+     */
+
+
+with a    as (select       "pidm", "term", "lvl", "apst", "admt", "styp"
+        from (select        saradap_pidm"pidm", saradap_term_code_entry"term", saradap_levl_code"lvl", saradap_apst_code"apst", saradap_admt_code"admt", saradap_styp_code"styp", row_number()
+        over (partition by  saradap_pidm
+              order by      saradap_appl_no desc nulls last) rn
+              from          saradap@prod
+              where         saradap_term_code_entry between '202230' and '202310'
+  and exists (select        stvapst_code from stvapst where stvapst_code=saradap_apst_code and stvapst_code='D')
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=saradap_levl_code and stvlevl_code='UG'))
+              where         rn=1   
+              and          "admt"='AT'),
+b         as (select       "b_pidm", "b_term", "b_appno", "user_id", "apdc", "apdc_date"
+        from (select        sarappd_pidm"b_pidm", sarappd_term_code_entry"b_term", sarappd_appl_no"b_appno", sarappd_user"user_id", sarappd_apdc_code"apdc", to_char(sarappd_apdc_date,'mm/dd/yyyy')"apdc_date", row_number()
+        over (partition by  sarappd_pidm || sarappd_appl_no
+              order by      sarappd_seq_no desc nulls last) rn
+              from          sarappd@prod
+              where         sarappd_term_code_entry between '202230' and '202310'
+              and           sarappd_pidm in(select "pidm" from a))
+              where         rn=1)
+
+      select (select        stvterm_desc from stvterm where stvterm_code="term") "semester", 
+             (select        spriden_id from spriden@prod where spriden_pidm="pidm" and spriden_change_ind is null and spriden_entity_ind='P') "pvamu_id",
+             (select        spriden_last_name ||', '|| spriden_first_name from spriden@prod where spriden_pidm="pidm" and spriden_change_ind is null and spriden_entity_ind='P') "applicant_name",                                                              
+                           "lvl", "admt", "styp",
+                           "apdc", 
+             (select        stvapdc_desc from stvapdc where stvapdc_code="apdc") "application_decision",
+                           "apdc_date",
+                           "user_id",
+             (select        guriden_desc from guriden@prod where guriden_user_id="user_id") "user_description"
+              
+        from  a
+  inner join  b         on "b_pidm"="pidm"
+
+    order by                3 asc ;
+
+
+/* ms 352 n 204 --------------------------------------------------------------------------------------------------
+| Id  | Operation                           | Name              | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |
+------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT REMOTE             |                   |     1 |    21 |   219   (0)| 00:00:01 |        |
+|*  1 |  INDEX RANGE SCAN                   | SPRIDEN_KEY_INDEX |     1 |    15 |     1   (0)| 00:00:01 |   PROD |
+|*  2 |  TABLE ACCESS BY INDEX ROWID BATCHED| SARAPPD           |     1 |    21 |   218   (0)| 00:00:01 |   PROD |
+|*  3 |   INDEX SKIP SCAN                   | PK_SARAPPD        |     1 |       |   217   (0)| 00:00:01 |   PROD |
+------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+
+###
