@@ -1,0 +1,36 @@
+/*
+     ods
+     SARAPPD DECISION BY SPECIFIC USER
+     M07MAR2022 \ 77j4f
+     */
+
+
+with a    as (select        sarappd_pidm"pidm", sarappd_user"user"
+              from          sarappd@prod
+              where         sarappd_term_code_entry='202310'
+              and           sarappd_user in('MECOOK','MKPEARSON'))
+
+      select               "pidm",  
+             (select        spriden_id from spriden@prod where spriden_pidm="pidm") "pvamu_id",        
+                           "user"
+
+        from  a ;
+
+
+/* ms 61 n 2 -----------------------------------------------------------------------------------------------------
+| Id  | Operation                           | Name              | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |
+------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT REMOTE             |                   |     1 |    21 |   219   (0)| 00:00:01 |        |
+|*  1 |  INDEX RANGE SCAN                   | SPRIDEN_KEY_INDEX |     1 |    15 |     1   (0)| 00:00:01 |   PROD |
+|*  2 |  TABLE ACCESS BY INDEX ROWID BATCHED| SARAPPD           |     1 |    21 |   218   (0)| 00:00:01 |   PROD |
+|*  3 |   INDEX SKIP SCAN                   | PK_SARAPPD        |     1 |       |   217   (0)| 00:00:01 |   PROD |
+------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+-- SELECT * FROM scbcrse@prod WHERE scbcrse_subj_code='GNST' ;
+
+
+###
