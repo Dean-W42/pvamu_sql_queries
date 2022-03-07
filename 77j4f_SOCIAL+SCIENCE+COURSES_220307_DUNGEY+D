@@ -1,0 +1,50 @@
+/*
+     ods
+     SOCIAL SCIENCE COURSES
+     College and Department Information for Active Courses
+     M07MAR2022 \ 77j4f
+     */
+
+
+with a    as (select       "scbcrse_subj", "scbcrse_numb", "eff_term", "clg", "dept", "csta", "course_title", "cip_code"
+        from (select        scbcrse_subj_code"scbcrse_subj", scbcrse_crse_numb"scbcrse_numb", scbcrse_eff_term"eff_term", scbcrse_coll_code"clg", scbcrse_dept_code"dept", scbcrse_csta_code"csta", scbcrse_title"course_title", scbcrse_cipc_code"cip_code", row_number()
+        over (partition by  scbcrse_subj_code || scbcrse_crse_numb
+              order by      scbcrse_eff_term desc nulls last) rn
+              from          scbcrse@prod
+              where         scbcrse_subj_code in('PHIL','POSC','SOCG'))
+              where         rn=1 
+              and          "csta"='A')
+
+      select               "clg", "dept",  
+             (select        stvdept_desc from stvdept where stvdept_code="dept") "department",      
+                           "scbcrse_subj", "scbcrse_numb", "csta", 
+             (select        stvcsta_desc from stvcsta where stvcsta_code="csta") "course_status",              
+                           "course_title", "cip_code", "eff_term",
+             (select        stvterm_desc from stvterm where stvterm_code="eff_term") "eff_semester"
+
+        from  a ;
+
+
+/* ms 22 n 93 ---------------------------------------------------------------------------------------------------------------
+| Id  | Operation                      | Name                       | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+-----------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT               |                            |    87 | 12615 |    90   (2)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID| STVDEPT                    |     1 |    26 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6301PK_STVDEPT |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  MAT_VIEW ACCESS BY INDEX ROWID| STVCSTA                    |     1 |    20 |     1   (0)| 00:00:01 |        |      |
+|*  4 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6286PK_STVCSTA |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   5 |  MAT_VIEW ACCESS BY INDEX ROWID| STVTERM                    |     1 |    19 |     1   (0)| 00:00:01 |        |      |
+|*  6 |   INDEX UNIQUE SCAN            | SYS_C_SNAP$_6469PK_STVTERM |     1 |       |     0   (0)| 00:00:01 |        |      |
+|*  7 |  VIEW                          |                            |    87 | 12615 |     6  (17)| 00:00:01 |        |      |
+|*  8 |   WINDOW SORT PUSHED RANK      |                            |    87 | 10440 |     6  (17)| 00:00:01 |        |      |
+|   9 |    REMOTE                      | SCBCRSE                    |    87 | 10440 |     5   (0)| 00:00:01 |   PROD | R->S |
+-----------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+-- SELECT * FROM scbcrse@prod WHERE scbcrse_subj_code='GNST' ;
+
+
+###
