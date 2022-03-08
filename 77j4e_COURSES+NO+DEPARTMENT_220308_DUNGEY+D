@@ -10,10 +10,10 @@ with a    as (select       "scbcrse_subj", "scbcrse_numb", "eff_term", "clg", "d
         from (select        scbcrse_subj_code"scbcrse_subj", scbcrse_crse_numb"scbcrse_numb", scbcrse_eff_term"eff_term", scbcrse_coll_code"clg", scbcrse_dept_code"dept", scbcrse_csta_code"csta", scbcrse_title"course_title", scbcrse_cipc_code"cip_code", row_number()
         over (partition by  scbcrse_subj_code || scbcrse_crse_numb
               order by      scbcrse_eff_term desc nulls last) rn   
-              from          scbcrse@prod
-              where         scbcrse_dept_code is null)
+              from          scbcrse@prod)
               where         rn=1 
-              and          "csta"='A')
+              and          "csta"='A' 
+              and          "dept" is null)
 
       select               "clg", "dept",  
              (select        stvdept_desc from stvdept where stvdept_code="dept") "department",      
