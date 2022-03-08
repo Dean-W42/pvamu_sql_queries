@@ -1,0 +1,323 @@
+/*
+     ods
+     EN GRADUATES WHO PURSUED PHD DEGREES
+     T08MAR2022 \ 77j4e
+     */
+
+
+with a    as (select       "pidm", "lvl", "degc", "clg", "majr", "grad_year"
+        from (select        shrdgmr_pidm"pidm", shrdgmr_levl_code"lvl", shrdgmr_degc_code"degc", shrdgmr_coll_code_1"clg", shrdgmr_majr_code_1"majr", to_char(shrdgmr_grad_date,'yyyy')"grad_year", row_number()
+        over (partition by  shrdgmr_pidm   
+    order by  to_char      (shrdgmr_grad_date,'yyyymmdd') asc nulls last) rn
+              from          shrdgmr@prod      
+where exists (select        stvcoll_code from stvcoll where stvcoll_code=shrdgmr_coll_code_1 and stvcoll_code='EN')
+  and exists (select        stvdegs_code from stvdegs where stvdegs_code=shrdgmr_degs_code and stvdegs_code='AW')
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=shrdgmr_levl_code and stvlevl_code in('UG','GR')))
+              where         rn=1), 
+              
+prog      as (select       "prog_pidm", "clg_dr", "lvl_dr", "degc_dr", "majr_dr", "term_1_dr"
+        from (select        sgbstdn_pidm"prog_pidm", sgbstdn_coll_code_1"clg_dr", sgbstdn_levl_code"lvl_dr", sgbstdn_degc_code_1"degc_dr", sgbstdn_majr_code_1"majr_dr", sgbstdn_term_code_eff"term_1_dr", row_number()
+        over (partition by  sgbstdn_pidm
+              order by      sgbstdn_term_code_eff asc nulls last) rn
+              from          sgbstdn@prod  
+where exists (select        stvlevl_code from stvlevl where stvlevl_code=sgbstdn_levl_code and stvlevl_code='DR')
+              and           sgbstdn_pidm in(select "pidm" from a))
+              where         rn=1),   
+
+grad      as (select       "grad_pidm", "grad_dr_yr"
+        from (select        shrdgmr_pidm"grad_pidm", to_char(shrdgmr_grad_date,'yyyy')"grad_dr_yr", row_number()
+        over (partition by  shrdgmr_pidm
+    order by  to_char      (shrdgmr_grad_date,'yyyymmdd') asc nulls last) rn
+              from          shrdgmr@prod
+where exists (select        stvdegs_code from stvdegs where stvdegs_code=shrdgmr_degs_code and stvdegs_code='AW')
+  and exists (select        stvlevl_code from stvlevl where stvlevl_code=shrdgmr_levl_code and stvlevl_code='DR')
+              and           shrdgmr_pidm in(select "pidm" from a))
+              where         rn=1),
+
+enrl      as (select       "enrl_pidm", "enrl"
+        from (select        sfrstcr_pidm"enrl_pidm", sfrstcr_crn"enrl", row_number()
+        over (partition by  sfrstcr_pidm
+              order by      sfrstcr_crn asc nulls last) rn
+              from          sfrstcr@prod
+where exists (select        stvrsts_code from stvrsts where stvrsts_code=sfrstcr_rsts_code and stvrsts_voice_type='R')
+              and           sfrstcr_term_code='202220'
+              and           sfrstcr_pidm in(select "pidm" from a))
+              where         rn=1),
+
+cell      as (select       "cell_pidm",coalesce(c1,c2,c3,c4,c5,c6,c7)"cell_phone"       
+        from (select       "pidm" "cell_pidm",               
+             (select       "c1" from(select t.sprtele_pidm"c1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"c1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('CE','CELL') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 and "c1_pidm"="pidm") c1,
+             (select       "c2" from(select u.sprtele_pidm"c2_pidm",u.sprtele_phone_area"c2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('CE','CELL') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn = 1 and "c2_pidm"="pidm") c2,
+             (select       "c3" from(select v.sprtele_pidm"c3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"c3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('CE','CELL') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 and "c3_pidm"="pidm") c3,
+             (select       "c4" from(select w.sprtele_pidm"c4_pidm",w.sprtele_phone_area"c4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('CE','CELL') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 and "c4_pidm"="pidm") c4,
+             (select       "c5" from(select x.sprtele_pidm"c5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"c5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('CE','CELL') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 and "c5_pidm"="pidm") C5,
+             (select       "c6" from(select y.sprtele_pidm"c6_pidm",substr(y.sprtele_phone_number,-10)"c6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('CE','CELL') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 and "c6_pidm"="pidm") c6,
+             (select       "c7" from(select z.sprtele_pidm"c7_pidm",z.sprtele_phone_number"c7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('CE','CELL') and regexp_like(z.sprtele_phone_number,'^\d{10}$')) where rn=1 and "c7_pidm"="pidm") c7
+              from          a)),
+
+home      as (select       "home_pidm",coalesce(h1,h2,h3,h4,h5,h6,h7,h8)"home_phone"      
+        from (select       "pidm" "home_pidm",   
+             (select       "h1" from(select t.sprtele_pidm"h1_pidm",t.sprtele_phone_area||t.sprtele_phone_number"h1",row_number() over(partition by t.sprtele_pidm order by t.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod t where t.sprtele_primary_ind='Y' and t.sprtele_status_ind is null and t.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(t.sprtele_phone_area,'^\d{3}$') and regexp_like(t.sprtele_phone_number,'^\d{7}$')) where rn=1 and "h1_pidm"="pidm") h1,
+             (select       "h2" from(select u.sprtele_pidm"h2_pidm",u.sprtele_phone_area"h2",row_number() over(partition by u.sprtele_pidm order by u.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod u where u.sprtele_primary_ind='Y' and u.sprtele_status_ind is null and u.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(u.sprtele_phone_area,'^\d{10}$')) where rn=1 and "h2_pidm"="pidm") h2,
+             (select       "h3" from(select v.sprtele_pidm"h3_pidm",v.sprtele_phone_area||v.sprtele_phone_number"h3",row_number() over(partition by v.sprtele_pidm order by v.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod v where v.sprtele_status_ind is null and v.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(v.sprtele_phone_area,'^\d{3}$') and regexp_like(v.sprtele_phone_number,'^\d{7}$')) where rn=1 and "h3_pidm"="pidm") h3,
+             (select       "h4" from(select w.sprtele_pidm"h4_pidm",w.sprtele_phone_area"h4",row_number() over(partition by w.sprtele_pidm order by w.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod w where w.sprtele_status_ind is null and w.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(w.sprtele_phone_area,'^\d{10}$')) where rn=1 and "h4_pidm"="pidm") h4,
+             (select       "h5" from(select x.sprtele_pidm"h5_pidm",x.sprtele_phone_area||x.sprtele_phone_number||x.sprtele_phone_ext"h5",row_number() over(partition by x.sprtele_pidm order by x.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod x where x.sprtele_status_ind is null and x.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(x.sprtele_phone_area,'^\d{3}$') and regexp_like(x.sprtele_phone_number,'^\d{3}$') and regexp_like(x.sprtele_phone_ext,'^\d{4}$')) where rn=1 and "h5_pidm"="pidm") h5,
+             (select       "h6" from(select y.sprtele_pidm"h6_pidm",substr(y.sprtele_phone_number,-10)"h6",row_number() over(partition by y.sprtele_pidm order by y.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod y where y.sprtele_status_ind is null and y.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(y.sprtele_phone_number,'^\d{12}$')) where rn=1 and "h6_pidm"="pidm") h6,
+             (select       "h7" from(select z.sprtele_pidm"h7_pidm",z.sprtele_phone_number"h7",row_number() over(partition by z.sprtele_pidm order by z.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod z where z.sprtele_status_ind is null and z.sprtele_tele_code in('AA','AD','AH','BI','BU','FA','MA','PR','RH') and regexp_like(z.sprtele_phone_number, '^\d{10}$')) where rn=1 and "h7_pidm"="pidm") h7,            
+             (select       "h8" from(select a.sprtele_pidm"h8_pidm",substr(a.sprtele_phone_area,1,4)||a.sprtele_phone_number"h8",row_number() over(partition by a.sprtele_pidm order by a.sprtele_surrogate_id desc nulls last) rn from saturn.sprtele@prod a where a.sprtele_status_ind is null and a.sprtele_atyp_code='AA' and regexp_like(a.sprtele_phone_area,'^\d{6}$') and regexp_like(a.sprtele_phone_number,'^\d{6}$')) where rn=1 and "h8_pidm"="pidm") h8
+              from          a)),  
+
+pvem      as (select       "pvem_pidm", coalesce(pv1,pv2,pv3,pv4)"pvamu_email"
+        from (select       "pidm" "pvem_pidm",                                
+             (select       "pv1" from(select w.goremal_pidm"pv1_pidm", w.goremal_email_address"pv1" from general.goremal@prod w where w.goremal_emal_code = 'PVEM' and w.goremal_status_ind = 'A') where "pv1_pidm" = "pidm") pv1,
+             (select       "pv2" from(select x.goremal_pidm"pv2_pidm", x.goremal_email_address"pv2" from general.goremal@prod x where x.goremal_emal_code = 'UNIV' and x.goremal_preferred_ind = 'Y' and x.goremal_status_ind = 'A') where "pv2_pidm" = "pidm") pv2,
+             (select       "pv3" from(select y.goremal_pidm"pv3_pidm", y.goremal_email_address"pv3" from general.goremal@prod y where y.goremal_emal_code = 'FACU' and y.goremal_preferred_ind = 'Y' and y.goremal_status_ind = 'A') where "pv3_pidm" = "pidm") pv3,
+             (select       "pv4" from(select z.goremal_pidm"pv4_pidm", z.goremal_email_address"pv4" from general.goremal@prod z where z.goremal_emal_code = 'UNIV' and z.goremal_preferred_ind = 'N' and z.goremal_status_ind = 'A') where "pv4_pidm" = "pidm") pv4
+              from          a)),
+
+prem      as (select       "prem_pidm", coalesce(pr1,pr2,pr3,pr4,pr5,pr6)"personal_email"
+        from (select       "pidm" "prem_pidm",
+             (select       "pr1" from(select u.goremal_pidm"pr1_pidm", u.goremal_email_address"pr1", row_number() over(partition by u.goremal_pidm order by u.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod u where u.goremal_emal_code = 'TXCA' and u.goremal_status_ind = 'A' and u.goremal_preferred_ind = 'Y' and regexp_like(u.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and u.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr1_pidm" = "pidm") pr1,
+             (select       "pr2" from(select v.goremal_pidm"pr2_pidm", v.goremal_email_address"pr2", row_number() over(partition by v.goremal_pidm order by v.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod v where v.goremal_emal_code = 'PERS' and v.goremal_status_ind = 'A' and v.goremal_preferred_ind = 'Y' and regexp_like(v.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and v.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr2_pidm" = "pidm") pr2,  
+             (select       "pr3" from(select w.goremal_pidm"pr3_pidm", w.goremal_email_address"pr3", row_number() over(partition by w.goremal_pidm order by w.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod w where w.goremal_emal_code = 'ALUM' and w.goremal_status_ind = 'A' and w.goremal_preferred_ind = 'Y' and regexp_like(w.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and w.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr3_pidm" = "pidm") pr3,  
+             (select       "pr4" from(select x.goremal_pidm"pr4_pidm", x.goremal_email_address"pr4", row_number() over(partition by x.goremal_pidm order by x.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod x where x.goremal_emal_code = 'PERS' and x.goremal_status_ind = 'A' and x.goremal_preferred_ind = 'N' and regexp_like(x.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and x.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr4_pidm" = "pidm") pr4,   
+             (select       "pr5" from(select y.goremal_pidm"pr5_pidm", y.goremal_email_address"pr5", row_number() over(partition by y.goremal_pidm order by y.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod y where y.goremal_emal_code = 'TXCA' and y.goremal_status_ind = 'A' and y.goremal_preferred_ind = 'N' and regexp_like(y.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and y.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr5_pidm" = "pidm") pr5,
+             (select       "pr6" from(select z.goremal_pidm"pr6_pidm", z.goremal_email_address"pr6", row_number() over(partition by z.goremal_pidm order by z.goremal_surrogate_id DESC nulls last) rn from general.goremal@prod z where z.goremal_emal_code = 'ISIR' and z.goremal_status_ind = 'A' and z.goremal_preferred_ind = 'N' and regexp_like(z.goremal_email_address,'^(\S+)\@(\S+)\.(\S+)$') and z.goremal_user_id <> 'AXIOMAUTOUPLOAD') where rn=1 and "pr6_pidm" = "pidm") pr6
+              from          a)), 
+
+addr      as (select       "addr_pidm", "street_addr", "city", "st", "zip_code", "natn"     
+        from (select        spraddr_pidm"addr_pidm", spraddr_street_line1||' '||spraddr_street_line2||' '||spraddr_street_line3"street_addr", spraddr_city"city", spraddr_stat_code"st", spraddr_zip"zip_code", spraddr_natn_code"natn", row_number() 
+        over (partition by  spraddr_pidm 
+    order by  to_char      (spraddr_activity_date,'yyyymmdd') desc nulls last, spraddr_seqno desc nulls last) rn 
+              from          saturn.spraddr@prod   
+              where         spraddr_status_ind is null 
+              and           spraddr_pidm in(select "pidm" from a)) 
+              where         rn=1), 
+              
+name      as (select        y.spriden_pidm"name_pidm", y.spriden_id"pvamu_id", y.spriden_last_name"last_name", y.spriden_first_name"first_name", y.spriden_mi"mi_name"
+              from          spriden@prod y
+              where         y.spriden_change_ind is null   
+              and           y.spriden_entity_ind='P'  
+              and           y.spriden_pidm in(select "pidm" from a))              
+              
+      select               "pvamu_id", "last_name", "first_name", "mi_name",
+                           "lvl", "degc", "clg", "majr",  
+             (select        stvmajr_desc from stvmajr where stvmajr_code="majr") "grad_major",
+                           "grad_year",
+                           "clg_dr", "lvl_dr", "degc_dr", "majr_dr", 
+             (select        stvmajr_desc from stvmajr where stvmajr_code="majr_dr") "major_dr",                             
+             (select        stvterm_desc from stvterm where stvterm_code="term_1_dr") "first_dr_term",   
+        case  when         "grad_dr_yr" is not null then 'Graduated' 
+              when         "enrl" is not null then 'Enrolled'
+              else         'Not Enrolled' end "current_status", 
+                           "grad_dr_yr",
+        case  when         "enrl" is not null then 'Yes' else 'No' end "enrolled_spr22",
+                           "cell_phone", "home_phone", 
+                           "pvamu_email", "personal_email",
+                           "street_addr", "city",   
+        case  when         "st" is not null then "st"
+              when         "natn" is not null then (select stvnatn_nation from stvnatn where stvnatn_code="natn")
+              else          null end "st_natn",                    
+                           "zip_code" 
+
+        from  a 
+
+  inner join  prog      on "prog_pidm"="pidm"  
+
+   left join  grad      on "grad_pidm"="pidm"
+
+   left join  enrl      on "enrl_pidm"="pidm" 
+
+   left join  cell      on "cell_pidm"="pidm" 
+
+   left join  home      on "home_pidm"="pidm" 
+
+   left join  pvem      on "pvem_pidm"="pidm" 
+
+   left join  prem      on "prem_pidm"="pidm" 
+
+   left join  addr      on "addr_pidm"="pidm" 
+
+   left join  name      on "name_pidm"="pidm" ;
+
+
+/* sec 33.501 n 90 ---------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |   236 |   451K|  7188  (13)| 00:00:01 |        |      |
+|   1 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVMAJR                     |     1 |    26 |     1   (0)| 00:00:01 |        |      |
+|*  2 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6368PK_STVMAJR  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   3 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVMAJR                     |     1 |    26 |     1   (0)| 00:00:01 |        |      |
+|*  4 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6368PK_STVMAJR  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|   5 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVTERM                     |     1 |    19 |     1   (0)| 00:00:01 |        |      |
+|*  6 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6469PK_STVTERM  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|*  7 |  VIEW                                    |                             |     1 |    64 |     5  (20)| 00:00:01 |        |      |
+|*  8 |   WINDOW SORT PUSHED RANK                |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|   9 |    REMOTE                                | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 10 |   VIEW                                   |                             |     1 |    40 |     5  (20)| 00:00:01 |        |      |
+|* 11 |    WINDOW SORT PUSHED RANK               |                             |     1 |    58 |     5  (20)| 00:00:01 |        |      |
+|  12 |     REMOTE                               | SPRTELE                     |     1 |    58 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 13 |    VIEW                                  |                             |     1 |    64 |     5  (20)| 00:00:01 |        |      |
+|* 14 |     WINDOW SORT PUSHED RANK              |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  15 |      REMOTE                              | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 16 |     VIEW                                 |                             |     1 |    40 |     5  (20)| 00:00:01 |        |      |
+|* 17 |      WINDOW SORT PUSHED RANK             |                             |     1 |    54 |     5  (20)| 00:00:01 |        |      |
+|  18 |       REMOTE                             | SPRTELE                     |     1 |    54 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 19 |      VIEW                                |                             |     1 |    84 |     5  (20)| 00:00:01 |        |      |
+|* 20 |       WINDOW SORT PUSHED RANK            |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  21 |        REMOTE                            | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 22 |       VIEW                               |                             |     1 |    48 |     5  (20)| 00:00:01 |        |      |
+|* 23 |        WINDOW SORT PUSHED RANK           |                             |     1 |    66 |     5  (20)| 00:00:01 |        |      |
+|  24 |         REMOTE                           | SPRTELE                     |     1 |    66 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 25 |        VIEW                              |                             |     1 |    52 |     5  (20)| 00:00:01 |        |      |
+|* 26 |         WINDOW SORT PUSHED RANK          |                             |     1 |    66 |     5  (20)| 00:00:01 |        |      |
+|  27 |          REMOTE                          | SPRTELE                     |     1 |    66 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 28 |  VIEW                                    |                             |     1 |    64 |     5  (20)| 00:00:01 |        |      |
+|* 29 |   WINDOW SORT PUSHED RANK                |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  30 |    REMOTE                                | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 31 |   VIEW                                   |                             |     1 |    40 |     5  (20)| 00:00:01 |        |      |
+|* 32 |    WINDOW SORT PUSHED RANK               |                             |     1 |    58 |     5  (20)| 00:00:01 |        |      |
+|  33 |     REMOTE                               | SPRTELE                     |     1 |    58 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 34 |    VIEW                                  |                             |     1 |    64 |     5  (20)| 00:00:01 |        |      |
+|* 35 |     WINDOW SORT PUSHED RANK              |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  36 |      REMOTE                              | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 37 |     VIEW                                 |                             |     1 |    40 |     5  (20)| 00:00:01 |        |      |
+|* 38 |      WINDOW SORT PUSHED RANK             |                             |     1 |    54 |     5  (20)| 00:00:01 |        |      |
+|  39 |       REMOTE                             | SPRTELE                     |     1 |    54 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 40 |      VIEW                                |                             |     1 |    84 |     5  (20)| 00:00:01 |        |      |
+|* 41 |       WINDOW SORT PUSHED RANK            |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  42 |        REMOTE                            | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 43 |       VIEW                               |                             |     1 |    48 |     5  (20)| 00:00:01 |        |      |
+|* 44 |        WINDOW SORT PUSHED RANK           |                             |     1 |    66 |     5  (20)| 00:00:01 |        |      |
+|  45 |         REMOTE                           | SPRTELE                     |     1 |    66 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 46 |        VIEW                              |                             |     1 |    52 |     5  (20)| 00:00:01 |        |      |
+|* 47 |         WINDOW SORT PUSHED RANK          |                             |     1 |    66 |     5  (20)| 00:00:01 |        |      |
+|  48 |          REMOTE                          | SPRTELE                     |     1 |    66 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 49 |         VIEW                             |                             |     1 |    60 |     5  (20)| 00:00:01 |        |      |
+|* 50 |          WINDOW SORT PUSHED RANK         |                             |     1 |    67 |     5  (20)| 00:00:01 |        |      |
+|  51 |           REMOTE                         | SPRTELE                     |     1 |    67 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  52 |  REMOTE                                  | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  53 |   REMOTE                                 | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  54 |    REMOTE                                | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  55 |     REMOTE                               | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 56 |  VIEW                                    |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 57 |   WINDOW SORT PUSHED RANK                |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  58 |    REMOTE                                | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 59 |   VIEW                                   |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 60 |    WINDOW SORT PUSHED RANK               |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  61 |     REMOTE                               | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 62 |    VIEW                                  |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 63 |     WINDOW SORT PUSHED RANK              |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  64 |      REMOTE                              | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 65 |     VIEW                                 |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 66 |      WINDOW SORT PUSHED RANK             |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  67 |       REMOTE                             | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 68 |      VIEW                                |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 69 |       WINDOW SORT PUSHED RANK            |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  70 |        REMOTE                            | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|* 71 |       VIEW                               |                             |     1 |   284 |     5  (20)| 00:00:01 |        |      |
+|* 72 |        WINDOW SORT PUSHED RANK           |                             |     1 |    72 |     5  (20)| 00:00:01 |        |      |
+|  73 |         REMOTE                           | GOREMAL                     |     1 |    72 |     4   (0)| 00:00:01 |   PROD | R->S |
+|  74 |  MAT_VIEW ACCESS BY INDEX ROWID          | STVNATN                     |     1 |    16 |     1   (0)| 00:00:01 |        |      |
+|* 75 |   INDEX UNIQUE SCAN                      | SYS_C_SNAP$_6378PK_STVNATN  |     1 |       |     0   (0)| 00:00:01 |        |      |
+|  76 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|  77 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D69F6_4A03AE91 |       |       |            |          |        |      |
+|* 78 |    VIEW                                  |                             |    86 |  6192 |   310   (1)| 00:00:01 |        |      |
+|* 79 |     WINDOW SORT PUSHED RANK              |                             |    86 |  6278 |   310   (1)| 00:00:01 |        |      |
+|  80 |      NESTED LOOPS                        |                             |    86 |  6278 |   309   (1)| 00:00:01 |        |      |
+|  81 |       NESTED LOOPS                       |                             |   171 | 11970 |   309   (1)| 00:00:01 |        |      |
+|  82 |        NESTED LOOPS                      |                             |     1 |     6 |     0   (0)| 00:00:01 |        |      |
+|* 83 |         INDEX UNIQUE SCAN                | SYS_C_SNAP$_6278PK_STVCOLL  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|* 84 |         INDEX UNIQUE SCAN                | SYS_C_SNAP$_6299PK_STVDEGS  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|  85 |        REMOTE                            | SHRDGMR                     |   171 | 10944 |   309   (1)| 00:00:01 |   PROD | R->S |
+|* 86 |       INDEX UNIQUE SCAN                  | SYS_C_SNAP$_6365PK_STVLEVL  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|* 87 |   HASH JOIN                              |                             |   236 |   451K|  6438  (15)| 00:00:01 |        |      |
+|* 88 |    VIEW                                  |                             |   122 |  9272 |   261   (1)| 00:00:01 |        |      |
+|* 89 |     WINDOW SORT PUSHED RANK              |                             |   122 |  9638 |   261   (1)| 00:00:01 |        |      |
+|  90 |      NESTED LOOPS                        |                             |   122 |  9638 |   260   (0)| 00:00:01 |        |      |
+|  91 |       NESTED LOOPS                       |                             |    86 |  1376 |     2   (0)| 00:00:01 |        |      |
+|* 92 |        INDEX UNIQUE SCAN                 | SYS_C_SNAP$_6365PK_STVLEVL  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|  93 |        VIEW                              | VW_NSO_5                    |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+|  94 |         SORT UNIQUE                      |                             |    86 |  1118 |            |          |        |      |
+|  95 |          VIEW                            |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+|  96 |           TABLE ACCESS FULL              | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+|  97 |       REMOTE                             | SGBSTDN                     |     1 |    63 |     3   (0)| 00:00:01 |   PROD | R->S |
+|* 98 |    HASH JOIN RIGHT OUTER                 |                             |   166 |   305K|  6177  (15)| 00:00:01 |        |      |
+|  99 |     VIEW                                 |                             |    96 | 38304 |   261   (1)| 00:00:01 |        |      |
+| 100 |      NESTED LOOPS                        |                             |    96 | 12768 |   261   (1)| 00:00:01 |        |      |
+| 101 |       VIEW                               | VW_NSO_1                    |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 102 |        HASH UNIQUE                       |                             |    86 |  1118 |            |          |        |      |
+| 103 |         VIEW                             |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 104 |          TABLE ACCESS FULL               | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 105 |       REMOTE                             | SPRIDEN                     |     1 |   120 |     3   (0)| 00:00:01 |   PROD | R->S |
+|*106 |     HASH JOIN OUTER                      |                             |   149 |   215K|  5916  (16)| 00:00:01 |        |      |
+|*107 |      HASH JOIN RIGHT OUTER               |                             |    86 | 70262 |  5654  (17)| 00:00:01 |        |      |
+| 108 |       VIEW                               |                             |    86 | 23306 |  1292  (20)| 00:00:01 |        |      |
+| 109 |        VIEW                              |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 110 |         TABLE ACCESS FULL                | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+|*111 |       HASH JOIN OUTER                    |                             |    86 | 46956 |  4362  (15)| 00:00:01 |        |      |
+|*112 |        HASH JOIN RIGHT OUTER             |                             |    86 | 23650 |  3672  (18)| 00:00:01 |        |      |
+| 113 |         VIEW                             |                             |    86 |  6106 |  1722  (20)| 00:00:01 |        |      |
+| 114 |          VIEW                            |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 115 |           TABLE ACCESS FULL              | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+|*116 |         HASH JOIN OUTER                  |                             |    86 | 17544 |  1949  (16)| 00:00:01 |        |      |
+|*117 |          HASH JOIN OUTER                 |                             |    86 | 11438 |   442   (1)| 00:00:01 |        |      |
+|*118 |           HASH JOIN OUTER                |                             |    86 |  8342 |   267   (1)| 00:00:01 |        |      |
+| 119 |            VIEW                          |                             |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 120 |             TABLE ACCESS FULL            | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+|*121 |            VIEW                          |                             |    49 |  1862 |   265   (1)| 00:00:01 |        |      |
+|*122 |             WINDOW SORT PUSHED RANK      |                             |    49 |  3087 |   265   (1)| 00:00:01 |        |      |
+|*123 |              HASH JOIN                   |                             |    49 |  3087 |   264   (1)| 00:00:01 |        |      |
+| 124 |               NESTED LOOPS               |                             |   114 |  6612 |   261   (1)| 00:00:01 |        |      |
+| 125 |                VIEW                      | VW_NSO_3                    |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 126 |                 HASH UNIQUE              |                             |    86 |  1118 |            |          |        |      |
+| 127 |                  VIEW                    |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 128 |                   TABLE ACCESS FULL      | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 129 |                REMOTE                    | SFRSTCR                     |     1 |    45 |     3   (0)| 00:00:01 |   PROD | R->S |
+|*130 |               MAT_VIEW ACCESS FULL       | STVRSTS                     |     9 |    45 |     3   (0)| 00:00:01 |        |      |
+|*131 |           VIEW                           |                             |    86 |  3096 |   175   (1)| 00:00:01 |        |      |
+|*132 |            WINDOW SORT PUSHED RANK       |                             |    86 |  4558 |   175   (1)| 00:00:01 |        |      |
+| 133 |             NESTED LOOPS                 |                             |    86 |  4558 |   174   (0)| 00:00:01 |        |      |
+| 134 |              NESTED LOOPS                |                             |    86 |  1634 |     2   (0)| 00:00:01 |        |      |
+| 135 |               NESTED LOOPS               |                             |     1 |     6 |     0   (0)| 00:00:01 |        |      |
+|*136 |                INDEX UNIQUE SCAN         | SYS_C_SNAP$_6299PK_STVDEGS  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+|*137 |                INDEX UNIQUE SCAN         | SYS_C_SNAP$_6365PK_STVLEVL  |     1 |     3 |     0   (0)| 00:00:01 |        |      |
+| 138 |               VIEW                       | VW_NSO_4                    |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 139 |                SORT UNIQUE               |                             |    86 |  1118 |            |          |        |      |
+| 140 |                 VIEW                     |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 141 |                  TABLE ACCESS FULL       | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 142 |              REMOTE                      | SHRDGMR                     |     1 |    34 |     2   (0)| 00:00:01 |   PROD | R->S |
+| 143 |          VIEW                            |                             |    86 |  6106 |  1507  (20)| 00:00:01 |        |      |
+| 144 |           VIEW                           |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 145 |            TABLE ACCESS FULL             | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 146 |        VIEW                              |                             |    86 | 23306 |   690   (0)| 00:00:01 |        |      |
+| 147 |         VIEW                             |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 148 |          TABLE ACCESS FULL               | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+|*149 |      VIEW                                |                             |   149 | 99234 |   262   (1)| 00:00:01 |        |      |
+|*150 |       WINDOW SORT PUSHED RANK            |                             |   149 | 21605 |   262   (1)| 00:00:01 |        |      |
+| 151 |        NESTED LOOPS                      |                             |   149 | 21605 |   262   (1)| 00:00:01 |        |      |
+| 152 |         VIEW                             | VW_NSO_2                    |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 153 |          HASH UNIQUE                     |                             |    86 |  1118 |            |          |        |      |
+| 154 |           VIEW                           |                             |    86 |  1118 |     2   (0)| 00:00:01 |        |      |
+| 155 |            TABLE ACCESS FULL             | SYS_TEMP_0FD9D69F6_4A03AE91 |    86 |  5074 |     2   (0)| 00:00:01 |        |      |
+| 156 |         REMOTE                           | SPRADDR                     |     2 |   264 |     3   (0)| 00:00:01 |   PROD | R->S |
+----------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+From: Obiomon, Pamela <phobiomon@pvamu.edu> 
+Sent: Tuesday, March 8, 2022 6:57 AM
+To: Williamson, Dean <CDWilliamson@PVAMU.EDU>
+Cc: Bonner, Fred <fabonner@PVAMU.EDU>
+Subject: Engineering graduates who pursued PhD degrees 
+
+Hello Dr. Williamson,
+Could your office provide us data (names and contact information) on engineering graduates who pursued PhD degrees?  We have a grant with Texas A'M and need to contact them for interviews.   
+
+Thanks, 
+Pamela Obiomon, PhD | Dean of the Roy G. Perry College of Engineering | (936) 261-9956
+
+
+###
