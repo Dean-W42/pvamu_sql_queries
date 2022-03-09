@@ -1,0 +1,28 @@
+/*
+     ods
+     COURSE INFORMATION
+     CLG DEPT SUBJ NUMB COURSE_TITLE EFF_TERM
+     W09MAR2022 \ 77j4d
+     */
+     
+                                 
+with a    as (select       "clg", "dept", "subj", "numb", "course_title", "csta", "eff_term" 
+        from (select        scbcrse_coll_code"clg", scbcrse_dept_code"dept", scbcrse_subj_code"subj", scbcrse_crse_numb"numb", scbcrse_title"course_title", scbcrse_csta_code"csta", scbcrse_eff_term"eff_term", row_number()
+        over (partition by  scbcrse_subj_code || scbcrse_crse_numb
+              order by      scbcrse_eff_term desc nulls last) rn
+              from          scbcrse@prod)
+              where         rn=1
+              and          "csta"='A')
+
+      select               "clg", "dept", "subj", "numb", "course_title", "eff_term"
+      
+        from  a ;         
+
+
+/* ms 25 n 2003
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
