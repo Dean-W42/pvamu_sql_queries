@@ -1,0 +1,37 @@
+/*
+     ods
+     PROGRAMS AND MAJORS THAT ARE ACTIVE
+     W09MAR2022 \ 77j4d
+     */
+     
+                                 
+with a    as (select       "clg", "dept", "program", "lvl", "degc", "majr", "camp", "term_eff", "curr_rule", "cmjr_rule" 
+        from (select        srvcmjr_coll_code"clg", srvcmjr_dept_code"dept", srvcmjr_program"program", srvcmjr_levl_code"lvl", srvcmjr_degc_code"degc", srvcmjr_majr_code"majr", srvcmjr_camp_code"camp", srvcmjr_term_code_eff"term_eff", srvcmjr_curr_rule"curr_rule", srvcmjr_cmjr_rule"cmjr_rule", row_number()
+        over (partition by  srvcmjr_program    
+              order by      srvcmjr_term_code_eff desc nulls last) rn
+              from          baninst1.srvcmjr@prod
+              where         srvcmjr_adm_ind='Y')
+              where         rn=1),  
+
+majr      as (select        stvmajr_code"majr_code", stvmajr_desc "major", stvmajr_valid_major_ind"majr_ind"
+              from          stvmajr
+              where         stvmajr_valid_major_ind='Y')
+
+      select               "clg", "dept",    
+             (select        stvdept_desc from stvdept where stvdept_code="dept") "department",      
+                           "program", "lvl", "degc", "majr", "major", "majr_ind", "camp", "term_eff", "curr_rule", "cmjr_rule" 
+
+        from  a   
+
+  inner join  majr      on "majr_code"="majr" 
+
+    order by               "clg", "dept", "lvl", "majr" ;
+
+
+/*
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
