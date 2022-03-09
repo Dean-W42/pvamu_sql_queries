@@ -1,0 +1,22 @@
+/*
+   ods
+   CAMP CODE CE or CEP
+   W09MAR2022 \ 77j4d
+   */
+
+-- select * from ssbsect@prod where ssbsect_seq_numb like '%CEP%' ; 
+-- select * from sfrstcr@prod where sfrstcr_crn='33040' and sfrstcr_term_code='202030' ;
+-- select * from sirasgn@prod where sirasgn_term_code='202030' and sirasgn_crn='33040' ;
+-- select * from sfrstcr@prod where sfrstcr_term_code='202220' and sfrstcr_camp_code='CE' ;
+-- select * from shrtgpa@prod where shrtgpa_term_code='202030' and shrtgpa_pidm=543653 ;
+-- select * from shrtrce@prod where shrtrce_pidm=543653 --and shrtrce_term_code_eff='202030' ;
+-- course HUMA 1303
+-- select * from sfrstcr@prod where sfrstcr_term_code='202030' and sfrstcr_pidm=543653 ;
+-- crn 32693,33039,33040
+-- select * from shrtckn@prod where shrtckn_term_code='202030' and shrtckn_pidm=543653 ;
+-- select * from shrtckg@prod where shrtckg_term_code='202030' and shrtckg_pidm=543653 ;
+
+
+/*
+
+###
