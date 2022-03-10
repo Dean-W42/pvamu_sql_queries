@@ -1,0 +1,45 @@
+/*
+   ods
+   APDC FOR FTFR 
+   R10MAR2022 \ 77j4c
+   */
+
+
+-- CURRENT FALL SEMESTER
+  variable         termA         varchar2(6) 
+  exec            :termA     := '202210' ;
+-- PRIOR SUMMER SEMESTER
+  variable         termB         varchar2(6) 
+  exec            :termB     := '202130' ;
+
+  
+  With a As      ( Select        x.szrcbm1_term_code"TERM", x.szrcbm1_pidm"PIDM", x.szrcbm1_clas_code"CLS", x.szrcbm1_trans_first_time"FTFR"
+  From                           pvamuir.ir_c_szrcbm1 x
+  Where                          x.szrcbm1_trans_first_time='000001'
+  And Exists     ( Select        a.stvclas_code From saturn.stvclas a Where a.stvclas_code=x.szrcbm1_clas_code And  a.stvclas_code Between '1' and '4')
+  And Exists     ( Select        b.stvterm_code From saturn.stvterm b Where b.stvterm_code=x.szrcbm1_term_code And  b.stvterm_code BETWEEN :termB AND :termA)),
+
+  top     AS     ( SELECT       "top_pidm", "apdc"
+        FROM     ( SELECT        sarappd_pidm"top_pidm", sarappd_apdc_code"apdc", Row_Number()
+        OVER     ( PARTITION BY  sarappd_pidm
+                   ORDER BY      sarappd_appl_no DESC nulls last) rn
+                   FROM          sarappd@prod
+                   WHERE         sarappd_term_code_entry BETWEEN :termB AND :termA
+                   AND           sarappd_apdc_code IN(SELECT stvapdc_code FROM stvapdc WHERE stvapdc_inst_acc_ind='Y')
+                   AND           sarappd_pidm IN(SELECT "PIDM" FROM a))
+                   WHERE         rn=1)
+
+  Select           DISTINCT     "PIDM", "apdc"  
+
+  From             a 
+
+  Left JOIN        top       ON "top_pidm"="PIDM" ;
+
+
+/*
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--  ner join (select       "xx
+
+
+###
