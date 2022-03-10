@@ -1,0 +1,159 @@
+/*
+  ods
+  AVG HS GPA
+  Average HS GPA Scores for First-Time Freshmen
+  W09MAR2022 \ 77j4d
+
+  -- Fall 2021         3.30
+  -- Fall 2018	\ Fall 2019	\ Fall 2020
+  --       3.1          3.2         3.3
+
+  */
+
+-- CURRENT FALL SEMESTER
+  variable         termA         varchar2(6) 
+  exec            :termA     := '202210' ;
+-- PRIOR SUMMER SEMESTER
+  variable         termB         varchar2(6) 
+  exec            :termB     := '202130' ;
+
+  
+  With a As      ( Select        x.szrcbm1_term_code"TERM", x.szrcbm1_pidm"PIDM", x.szrcbm1_clas_code"CLS", x.szrcbm1_trans_first_time"FTFR"
+  From                           pvamuir.ir_c_szrcbm1 x
+  Where                          x.szrcbm1_trans_first_time='000001'
+  And Exists     ( Select        a.stvclas_code From saturn.stvclas a Where a.stvclas_code=x.szrcbm1_clas_code And  a.stvclas_code Between '1' and '4')
+  And Exists     ( Select        b.stvterm_code From saturn.stvterm b Where b.stvterm_code=x.szrcbm1_term_code And  b.stvterm_code BETWEEN :termB AND :termA)),
+
+  hsch    AS     ( SELECT       "hsch_pidm", "hsch_gpa" 
+        FROM     ( SELECT        c.sorhsch_pidm"hsch_pidm", c.sorhsch_gpa"hsch_gpa", Row_Number()
+        OVER     ( PARTITION BY  c.sorhsch_pidm
+    ORDER BY       To_Char      (c.sorhsch_activity_date,'yyyymmdd') DESC nulls last) rn
+                   FROM          saturn.sorhsch c
+                   WHERE         c.sorhsch_pidm IN(SELECT "PIDM" FROM a))
+                   WHERE         rn=1)
+
+  Select           Round       ( Sum("hsch_gpa")/Count("PIDM"),1 ) "Avg_HS_GPA"  
+
+  From                           a 
+
+  LEFT JOIN        hsch      ON "hsch_pidm"="PIDM" ;
+
+
+/* ms 818 n 1 --------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |     1 |    71 |  1985   (1)| 00:00:01 |        |      |
+|   1 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|   2 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D6783_F9262A07 |       |       |            |          |        |      |
+|   3 |    NESTED LOOPS                          |                             |   298 |  7748 |  1085   (1)| 00:00:01 |        |      |
+|   4 |     NESTED LOOPS                         |                             |     1 |     9 |     0   (0)| 00:00:01 |        |      |
+|*  5 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6267PK_STVCLAS  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|*  6 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6469PK_STVTERM  |     1 |     7 |     0   (0)| 00:00:01 |        |      |
+|*  7 |     TABLE ACCESS FULL                    | IR_C_SZRCBM1                |   298 |  5066 |  1085   (1)| 00:00:01 |        |      |
+|   8 |   SORT AGGREGATE                         |                             |     1 |    71 |            |          |        |      |
+|*  9 |    HASH JOIN                             |                             |   309 | 21939 |   899   (1)| 00:00:01 |        |      |
+|  10 |     VIEW                                 |                             |   298 |  3874 |     2   (0)| 00:00:01 |        |      |
+|  11 |      TABLE ACCESS FULL                   | SYS_TEMP_0FD9D6783_F9262A07 |   298 |  5066 |     2   (0)| 00:00:01 |        |      |
+|* 12 |     VIEW                                 |                             |   309 | 17922 |   897   (1)| 00:00:01 |        |      |
+|* 13 |      WINDOW SORT PUSHED RANK             |                             |   309 | 21321 |   897   (1)| 00:00:01 |        |      |
+|  14 |       NESTED LOOPS                       |                             |   309 | 21321 |   897   (1)| 00:00:01 |        |      |
+|  15 |        NESTED LOOPS                      |                             |   298 |  2980 |     2   (0)| 00:00:01 |        |      |
+|* 16 |         INDEX UNIQUE SCAN                | SYS_C_SNAP$_6470PK_STVTESC  |     1 |     5 |     0   (0)| 00:00:01 |        |      |
+|  17 |         SORT UNIQUE                      |                             |   298 |  1490 |     2   (0)| 00:00:01 |        |      |
+|  18 |          VIEW                            |                             |   298 |  1490 |     2   (0)| 00:00:01 |        |      |
+|  19 |           TABLE ACCESS FULL              | SYS_TEMP_0FD9D6783_F9262A07 |   298 |  5066 |     2   (0)| 00:00:01 |        |      |
+|  20 |        REMOTE                            | SORTEST                     |     1 |    59 |     3   (0)| 00:00:01 |   PROD | R->S |
+----------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--With a As      ( Select 
+
+
+/*
+  With a As      ( Select        x.szrcbm1_term_code"TERM", x.szrcbm1_pidm"PIDM", x.szrcbm1_clas_code"CLS", x.szrcbm1_trans_first_time"FTFR"
+  From                           pvamuir.ir_c_szrcbm1 x
+  Where                          x.szrcbm1_trans_first_time='000001'
+  And Exists     ( Select        a.stvclas_code From saturn.stvclas a Where a.stvclas_code=x.szrcbm1_clas_code And (a.stvclas_code='1' And a.stvclas_code Not Between '2' And '7') )
+  And Exists     ( Select        b.stvterm_code From saturn.stvterm b Where b.stvterm_code=x.szrcbm1_term_code And (b.stvterm_code='202210' And b.stvterm_code Not Between '200710' And '202130') ))
+
+  Select           To_Char     ( Sum("SAT") / Count("PIDM"), 9999 ) "Avg_SAT"  
+
+  From                           a 
+
+  Inner Join     ( Select       "sortest_pidm", "SAT"
+  From           ( Select        x.sortest_pidm"sortest_pidm", x.sortest_test_score"SAT", Row_Number()
+  Over           ( Partition By  x.sortest_pidm Order By To_Char(x.sortest_test_score,9999) desc nulls last ) Rn
+  From                           saturn.sortest@prod x
+  Where Exists   ( Select        a.stvtesc_code From saturn.stvtesc a Where a.stvtesc_code=x.sortest_tesc_code And a.stvtesc_code='S10' )
+  And Exists     ( Select       "PIDM" From a Where "PIDM"=x.sortest_pidm) )
+  Where                          Rn=1 )
+  On                            "sortest_pidm"="PIDM"
+  ;
+/* ms 803 n 1 --------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                                | Name                        | Rows  | Bytes | Cost (%CPU)| Time     | Inst   |IN-OUT|
+----------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                         |                             |     1 |    71 |  1985   (1)| 00:00:01 |        |      |
+|   1 |  TEMP TABLE TRANSFORMATION               |                             |       |       |            |          |        |      |
+|   2 |   LOAD AS SELECT (CURSOR DURATION MEMORY)| SYS_TEMP_0FD9D677F_F9262A07 |       |       |            |          |        |      |
+|   3 |    NESTED LOOPS                          |                             |   298 |  7748 |  1085   (1)| 00:00:01 |        |      |
+|   4 |     NESTED LOOPS                         |                             |     1 |     9 |     0   (0)| 00:00:01 |        |      |
+|*  5 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6267PK_STVCLAS  |     1 |     2 |     0   (0)| 00:00:01 |        |      |
+|*  6 |      INDEX UNIQUE SCAN                   | SYS_C_SNAP$_6469PK_STVTERM  |     1 |     7 |     0   (0)| 00:00:01 |        |      |
+|*  7 |     TABLE ACCESS FULL                    | IR_C_SZRCBM1                |   298 |  5066 |  1085   (1)| 00:00:01 |        |      |
+|   8 |   SORT AGGREGATE                         |                             |     1 |    71 |            |          |        |      |
+|*  9 |    HASH JOIN                             |                             |   309 | 21939 |   899   (1)| 00:00:01 |        |      |
+|  10 |     VIEW                                 |                             |   298 |  3874 |     2   (0)| 00:00:01 |        |      |
+|  11 |      TABLE ACCESS FULL                   | SYS_TEMP_0FD9D677F_F9262A07 |   298 |  5066 |     2   (0)| 00:00:01 |        |      |
+|* 12 |     VIEW                                 |                             |   309 | 17922 |   897   (1)| 00:00:01 |        |      |
+|* 13 |      WINDOW SORT PUSHED RANK             |                             |   309 | 21321 |   897   (1)| 00:00:01 |        |      |
+|  14 |       NESTED LOOPS                       |                             |   309 | 21321 |   897   (1)| 00:00:01 |        |      |
+|  15 |        NESTED LOOPS                      |                             |   298 |  2980 |     2   (0)| 00:00:01 |        |      |
+|* 16 |         INDEX UNIQUE SCAN                | SYS_C_SNAP$_6470PK_STVTESC  |     1 |     5 |     0   (0)| 00:00:01 |        |      |
+|  17 |         SORT UNIQUE                      |                             |   298 |  1490 |     2   (0)| 00:00:01 |        |      |
+|  18 |          VIEW                            |                             |   298 |  1490 |     2   (0)| 00:00:01 |        |      |
+|  19 |           TABLE ACCESS FULL              | SYS_TEMP_0FD9D677F_F9262A07 |   298 |  5066 |     2   (0)| 00:00:01 |        |      |
+|  20 |        REMOTE                            | SORTEST                     |     1 |    59 |     3   (0)| 00:00:01 |   PROD | R->S |
+----------------------------------------------------------------------------------------------------------------------------------------
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--With a As      ( Select  
+
+
+/*
+  With a As      ( Select        x.szrcbm1_term_code"TERM", x.szrcbm1_pidm"PIDM", x.szrcbm1_clas_code"CLS", x.szrcbm1_trans_first_time"FTFR"
+  From                           pvamuir.ir_c_szrcbm1 x
+  Where                          x.szrcbm1_trans_first_time='000001'
+  And Exists     ( Select        a.stvclas_code From saturn.stvclas a Where a.stvclas_code=x.szrcbm1_clas_code And (a.stvclas_code='1' And a.stvclas_code Not Between '2' And '7') )
+  And Exists     ( Select        b.stvterm_code From saturn.stvterm b Where b.stvterm_code=x.szrcbm1_term_code And (b.stvterm_code='202210' And b.stvterm_code Not Between '200710' And '202130' )) )
+
+  Select                        "TERM", "PIDM", "CLS", "FTFR",
+                                "SAT"
+
+  From                           a 
+
+  Inner Join     ( Select       "sortest_pidm", "SAT"
+  From           ( Select        x.sortest_pidm"sortest_pidm", x.sortest_test_score"SAT", Row_Number()
+  Over           ( Partition By  x.sortest_pidm Order By To_Char(x.sortest_test_score,9999) desc nulls last ) Rn
+  From                           saturn.sortest@prod x
+  Where Exists   ( Select        a.stvtesc_code From saturn.stvtesc a Where a.stvtesc_code=x.sortest_tesc_code And a.stvtesc_code='S10' )
+  And Exists     ( Select       "PIDM" From a Where "PIDM"=x.sortest_pidm) )
+  Where                          Rn=1 )
+  On                            "sortest_pidm"="PIDM"
+  ;
+--with a as      ( select       "x
+--x as           ( xx           "xxxx
+
+
+
+/*
+--SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY());
+--explain plan for
+--with a as ( select     "x
+--x as           ( xx           "xxxx
+--With a As      ( Select  
+
+
+Average SAT Scores and Average ACT Scores by University						
+
+
+###
